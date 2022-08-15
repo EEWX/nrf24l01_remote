@@ -1,0 +1,1314 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 07/Jul/2020  21:30:07
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\User\nrf24l01.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\nrf24l01.c" -e -Om
+#        --no_unroll --no_inline --no_tbaa --no_cross_call --debug --code_model
+#        small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\nrf24l01.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\nrf24l01.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\User\nrf24l01.c
+      1          #include "stm8l15x.h"
+      2          #include "nrf24l01.h"
+      3          #include "atomtimer.h"
+      4          //////////////////////////////////////////////////////////////////////////////////	 
+      5          //?????????,??????,??????????
+      6          //ALIENTEK STM32F407???
+      7          //NRF24L01????	   
+      8          //????@ALIENTEK
+      9          //????:www.openedv.com
+     10          //????:2014/5/9
+     11          //??:V1.0
+     12          //????,?????
+     13          //Copyright(C) ????????????? 2014-2024
+     14          //All rights reserved									  
+     15          ////////////////////////////////////////////////////////////////////////////////// 	
+     16              
+
+   \                                 In section .near.data, align 1
+     17          uint8_t TX_ADDRESS[TX_ADR_WIDTH]={0xA5,0xA5,0xA5,0xA5,0xA5}; //????
+   \                     TX_ADDRESS:
+   \   000000 A5 A5 A5 A5  DC8 165, 165, 165, 165, 165
+   \          A5          
+
+   \                                 In section .near.data, align 1
+     18          uint8_t RX_ADDRESS[RX_ADR_WIDTH]={0xA5,0xA5,0xA5,0xA5,0xA5}; //????
+   \                     RX_ADDRESS:
+   \   000000 A5 A5 A5 A5  DC8 165, 165, 165, 165, 165
+   \          A5          
+     19          
+
+   \                                 In section .near.bss, align 1
+     20          uint8_t nrf_tx_pipe[6][TX_PLOAD_WIDTH];
+   \                     nrf_tx_pipe:
+   \   000000              DS8 96
+     21          
+
+   \                                 In section .near.bss, align 1
+     22          uint8_t nrf_rx_pipe[6][RX_PLOAD_WIDTH];
+   \                     nrf_rx_pipe:
+   \   000000              DS8 96
+     23          
+
+   \                                 In section .near.bss, align 1
+     24          static NRF24L01_Flag_TypeDef nrf_flags;
+   \                     nrf_flags:
+   \   000000              DS8 1
+
+   \                                 In section .near.bss, align 1
+     25          static NRF24L01_Status_TypeDef nrf_status;
+   \                     nrf_status:
+   \   000000              DS8 1
+     26          
+     27          //???24L01?IO?
+
+   \                                 In section .near_func.text, align 1
+     28          void NRF24L01_Init(void)
+     29          {  
+   \                     NRF24L01_Init:
+   \   000000 3B ....      PUSH      S:?b8
+     30            char cnt = 0;
+   \   000003 3F ..        CLR       S:?b8
+     31            GPIO_Init(NRF24L01_CE_PORT,NRF24L01_CE_PIN,GPIO_Mode_Out_PP_High_Fast);
+   \   000005 35 F0 ....   MOV       S:?b0, #0xf0
+   \   000009 A6 08        LD        A, #0x8
+   \   00000B AE 5005      LDW       X, #0x5005
+   \   00000E CD ....      CALL      L:GPIO_Init
+     32            GPIO_Init(NRF24L01_nCS_PORT,NRF24L01_nCS_PIN,GPIO_Mode_Out_PP_High_Fast);
+   \   000011 35 F0 ....   MOV       S:?b0, #0xf0
+   \   000015 A6 10        LD        A, #0x10
+   \   000017 AE 5005      LDW       X, #0x5005
+   \   00001A CD ....      CALL      L:GPIO_Init
+     33            
+     34            GPIO_Init(NRF24L01_SCK_PORT,NRF24L01_SCK_PIN,GPIO_Mode_Out_PP_Low_Fast);
+   \   00001D 35 E0 ....   MOV       S:?b0, #0xe0
+   \   000021 A6 20        LD        A, #0x20
+   \   000023 AE 5005      LDW       X, #0x5005
+   \   000026 CD ....      CALL      L:GPIO_Init
+     35            GPIO_Init(NRF24L01_MOSI_PORT,NRF24L01_MOSI_PIN,GPIO_Mode_Out_PP_High_Fast);
+   \   000029 35 F0 ....   MOV       S:?b0, #0xf0
+   \   00002D A6 40        LD        A, #0x40
+   \   00002F AE 5005      LDW       X, #0x5005
+   \   000032 CD ....      CALL      L:GPIO_Init
+     36            GPIO_Init(NRF24L01_MISO_PORT,NRF24L01_MISO_PIN,GPIO_Mode_In_FL_No_IT);
+   \   000035 3F ..        CLR       S:?b0
+   \   000037 A6 80        LD        A, #0x80
+   \   000039 AE 5005      LDW       X, #0x5005
+   \   00003C CD ....      CALL      L:GPIO_Init
+     37            
+     38            CLK_PeripheralClockConfig(CLK_Peripheral_SPI1,ENABLE);
+   \   00003F 35 01 ....   MOV       S:?b0, #0x1
+   \   000043 A6 04        LD        A, #0x4
+   \   000045 CD ....      CALL      L:CLK_PeripheralClockConfig
+     39            SPI_Init(SPI1,SPI_FirstBit_MSB,SPI_BaudRatePrescaler_32,SPI_Mode_Master,SPI_CPOL_Low,SPI_CPHA_1Edge,SPI_Direction_2Lines_FullDuplex,SPI_NSS_Soft,7);
+   \   000048 35 07 ....   MOV       S:?b6, #0x7
+   \   00004C 35 02 ....   MOV       S:?b5, #0x2
+   \   000050 3F ..        CLR       S:?b4
+   \   000052 3F ..        CLR       S:?b3
+   \   000054 3F ..        CLR       S:?b2
+   \   000056 35 04 ....   MOV       S:?b1, #0x4
+   \   00005A 35 20 ....   MOV       S:?b0, #0x20
+   \   00005E 4F           CLR       A
+   \   00005F AE 5200      LDW       X, #0x5200
+   \   000062 CD ....      CALL      L:SPI_Init
+     40            
+     41            GPIO_Init(NRF24L01_IRQ_PORT,NRF24L01_IRQ_PIN,GPIO_Mode_In_PU_IT);
+   \   000065 35 60 ....   MOV       S:?b0, #0x60
+   \   000069 A6 04        LD        A, #0x4
+   \   00006B AE 5005      LDW       X, #0x5005
+   \   00006E CD ....      CALL      L:GPIO_Init
+     42            EXTI_SetPinSensitivity(EXTI_Pin_2,EXTI_Trigger_Falling);
+   \   000071 35 02 ....   MOV       S:?b0, #0x2
+   \   000075 A6 04        LD        A, #0x4
+   \   000077 CD ....      CALL      L:EXTI_SetPinSensitivity
+     43            
+     44            SPI_Cmd(SPI1,ENABLE);
+   \   00007A A6 01        LD        A, #0x1
+   \   00007C AE 5200      LDW       X, #0x5200
+   \   00007F CD ....      CALL      L:SPI_Cmd
+     45            atomTimerDelay(10);
+   \   000082 AE 000A      LDW       X, #0xa
+   \   000085 BF ..        LDW       S:?w1, X
+   \   000087 5F           CLRW      X
+   \   000088 BF ..        LDW       S:?w0, X
+   \   00008A CD ....      CALL      L:atomTimerDelay
+     46          
+     47            NRF24L01_CE_RESET();	
+   \   00008D A6 08        LD        A, #0x8
+   \   00008F AE 5005      LDW       X, #0x5005
+   \   000092 CD ....      CALL      L:GPIO_ResetBits
+     48            while(NRF24L01_Check())
+   \                     ??NRF24L01_Init_0:
+   \   000095 CD ....      CALL      L:NRF24L01_Check
+   \   000098 A1 00        CP        A, #0x0
+   \   00009A 27 12        JREQ      L:??NRF24L01_Init_1
+     49            {
+     50              atomTimerDelay(1);
+   \   00009C 5F           CLRW      X
+   \   00009D BF ..        LDW       S:?w0, X
+   \   00009F 5C           INCW      X
+   \   0000A0 BF ..        LDW       S:?w1, X
+   \   0000A2 CD ....      CALL      L:atomTimerDelay
+     51              cnt++;
+   \   0000A5 B6 ..        LD        A, S:?b8
+   \   0000A7 4C           INC       A
+   \   0000A8 B7 ..        LD        S:?b8, A
+     52              if(cnt > 20)
+   \   0000AA A1 15        CP        A, #0x15
+   \   0000AC 25 E7        JRC       L:??NRF24L01_Init_0
+     53              {
+     54                break;
+     55              }
+     56            }
+     57            NRF24L01_RF_Config(0,NRF24L01_PA_Power_0dBm,NRF24L01_DataRate_1Mbps,DISABLE);
+   \                     ??NRF24L01_Init_1:
+   \   0000AE 3F ..        CLR       S:?b2
+   \   0000B0 3F ..        CLR       S:?b1
+   \   0000B2 35 06 ....   MOV       S:?b0, #0x6
+   \   0000B6 4F           CLR       A
+   \   0000B7 CD ....      CALL      L:NRF24L01_RF_Config
+     58            NRF24L01_DataPipeConfig(NRF24L01_pipe0,RX_ADDRESS,5,RX_PLOAD_WIDTH,ENABLE,ENABLE);
+   \   0000BA 35 01 ....   MOV       S:?b3, #0x1
+   \   0000BE 35 01 ....   MOV       S:?b2, #0x1
+   \   0000C2 35 10 ....   MOV       S:?b1, #0x10
+   \   0000C6 35 05 ....   MOV       S:?b0, #0x5
+   \   0000CA AE ....      LDW       X, #RX_ADDRESS
+   \   0000CD 4F           CLR       A
+   \   0000CE CD ....      CALL      L:NRF24L01_DataPipeConfig
+     59            NRF24L01_SetTX_Address(TX_ADDRESS,5);
+   \   0000D1 A6 05        LD        A, #0x5
+   \   0000D3 AE ....      LDW       X, #TX_ADDRESS
+   \   0000D6 CD ....      CALL      L:NRF24L01_SetTX_Address
+     60            NRF24L01_CRC_Config(NRF24L01_CRC_16,ENABLE);
+   \   0000D9 35 01 ....   MOV       S:?b0, #0x1
+   \   0000DD A6 04        LD        A, #0x4
+   \   0000DF CD ....      CALL      L:NRF24L01_CRC_Config
+     61            NRF24L01_ModeManage(NRF24L01_Mode_TX);
+   \   0000E2 A6 03        LD        A, #0x3
+   \   0000E4 CD ....      CALL      L:NRF24L01_ModeManage
+     62          }
+   \   0000E7 32 ....      POP       S:?b8
+   \   0000EA 81           RET
+     63          //??24L01????
+     64          //???:0,??;1,??	
+
+   \                                 In section .near_func.text, align 1
+     65          uint8_t NRF24L01_Check(void)
+     66          {
+     67          	static uint8_t buf[5]={1,2,3,4,5};
+     68          	uint8_t i; 
+     69          	NRF24L01_Write_Buf(NRF_WRITE_REG+TX_ADDR,TX_ADDRESS,5);//??5??????.	
+   \                     NRF24L01_Check:
+   \   000000 35 05 ....   MOV       S:?b0, #0x5
+   \   000004 AE ....      LDW       X, #TX_ADDRESS
+   \   000007 A6 30        LD        A, #0x30
+   \   000009 CD ....      CALL      L:NRF24L01_Write_Buf
+     70          	NRF24L01_Read_Buf(TX_ADDR,buf,5); //???????  
+   \   00000C 35 05 ....   MOV       S:?b0, #0x5
+   \   000010 AE ....      LDW       X, #??buf
+   \   000013 A6 10        LD        A, #0x10
+   \   000015 CD ....      CALL      L:NRF24L01_Read_Buf
+     71          	for(i=0;i<5;i++)
+   \   000018 3F ..        CLR       S:?b0
+   \   00001A 20 05        JRA       L:??NRF24L01_Check_0
+   \                     ??NRF24L01_Check_1:
+   \   00001C B6 ..        LD        A, S:?b0
+   \   00001E 4C           INC       A
+   \   00001F B7 ..        LD        S:?b0, A
+   \                     ??NRF24L01_Check_0:
+   \   000021 B6 ..        LD        A, S:?b0
+   \   000023 A1 05        CP        A, #0x5
+   \   000025 24 0A        JRNC      L:??NRF24L01_Check_2
+     72                  {
+     73                    if(buf[i]!=TX_ADDRESS[i])break;
+   \   000027 5F           CLRW      X
+   \   000028 97           LD        XL, A
+   \   000029 D6 ....      LD        A, (L:TX_ADDRESS,X)
+   \   00002C D1 ....      CP        A, (L:??buf,X)
+   \   00002F 27 EB        JREQ      L:??NRF24L01_Check_1
+     74                  }
+     75          	if(i!=5)return 1;//??24L01??	
+   \                     ??NRF24L01_Check_2:
+   \   000031 B6 ..        LD        A, S:?b0
+   \   000033 A1 05        CP        A, #0x5
+   \   000035 27 03        JREQ      L:??NRF24L01_Check_3
+   \   000037 A6 01        LD        A, #0x1
+   \   000039 81           RET
+     76          	return 0;		 //???24L01
+   \                     ??NRF24L01_Check_3:
+   \   00003A 4F           CLR       A
+   \   00003B 81           RET
+     77          }	 	 
+
+   \                                 In section .near.data, align 1
+   \                     ??buf:
+   \   000000 01 02 03 04  DC8 1, 2, 3, 4, 5
+   \          05          
+     78          //SPI????
+     79          //reg:???????
+     80          //value:????
+
+   \                                 In section .near_func.text, align 1
+     81          uint8_t NRF24L01_Write_Reg(uint8_t reg,uint8_t value)
+     82          {
+   \                     NRF24L01_Write_Reg:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 B7 ..        LD        S:?b8, A
+   \   000005 45 .. ..     MOV       S:?b9, S:?b0
+     83          	uint8_t status;	
+     84                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Write_Reg_0:
+   \   000008 A6 80        LD        A, #0x80
+   \   00000A AE 5200      LDW       X, #0x5200
+   \   00000D CD ....      CALL      L:SPI_GetFlagStatus
+   \   000010 4A           DEC       A
+   \   000011 27 F5        JREQ      L:??NRF24L01_Write_Reg_0
+     85             	NRF24L01_NCS_RESET();                 //??SPI??
+   \   000013 A6 10        LD        A, #0x10
+   \   000015 AE 5005      LDW       X, #0x5005
+   \   000018 CD ....      CALL      L:GPIO_ResetBits
+     86                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Write_Reg_1:
+   \   00001B A6 02        LD        A, #0x2
+   \   00001D AE 5200      LDW       X, #0x5200
+   \   000020 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000023 A1 00        CP        A, #0x0
+   \   000025 27 F4        JREQ      L:??NRF24L01_Write_Reg_1
+     87                  SPI_SendData(SPI1,reg);
+   \   000027 B6 ..        LD        A, S:?b8
+   \   000029 AE 5200      LDW       X, #0x5200
+   \   00002C CD ....      CALL      L:SPI_SendData
+     88                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_RXNE) == RESET);
+   \                     ??NRF24L01_Write_Reg_2:
+   \   00002F A6 01        LD        A, #0x1
+   \   000031 AE 5200      LDW       X, #0x5200
+   \   000034 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000037 A1 00        CP        A, #0x0
+   \   000039 27 F4        JREQ      L:??NRF24L01_Write_Reg_2
+     89                  status = SPI_ReceiveData(SPI1);
+   \   00003B AE 5200      LDW       X, #0x5200
+   \   00003E CD ....      CALL      L:SPI_ReceiveData
+   \   000041 B7 ..        LD        S:?b8, A
+     90                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Write_Reg_3:
+   \   000043 A6 02        LD        A, #0x2
+   \   000045 AE 5200      LDW       X, #0x5200
+   \   000048 CD ....      CALL      L:SPI_GetFlagStatus
+   \   00004B A1 00        CP        A, #0x0
+   \   00004D 27 F4        JREQ      L:??NRF24L01_Write_Reg_3
+     91            	SPI_SendData(SPI1,value);      //???????
+   \   00004F B6 ..        LD        A, S:?b9
+   \   000051 AE 5200      LDW       X, #0x5200
+   \   000054 CD ....      CALL      L:SPI_SendData
+     92                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Write_Reg_4:
+   \   000057 A6 80        LD        A, #0x80
+   \   000059 AE 5200      LDW       X, #0x5200
+   \   00005C CD ....      CALL      L:SPI_GetFlagStatus
+   \   00005F 4A           DEC       A
+   \   000060 27 F5        JREQ      L:??NRF24L01_Write_Reg_4
+     93            	NRF24L01_NCS_SET();                 //??SPI??	   
+   \   000062 A6 10        LD        A, #0x10
+   \   000064 AE 5005      LDW       X, #0x5005
+   \   000067 CD ....      CALL      L:GPIO_SetBits
+     94            	return(status);       			//?????
+   \   00006A B6 ..        LD        A, S:?b8
+   \   00006C CC ....      JP        L:?epilogue_w4
+     95          }
+     96          //??SPI????
+     97          //reg:??????
+
+   \                                 In section .near_func.text, align 1
+     98          uint8_t NRF24L01_Read_Reg(uint8_t reg)
+     99          {
+   \                     NRF24L01_Read_Reg:
+   \   000000 3B ....      PUSH      S:?b8
+   \   000003 B7 ..        LD        S:?b8, A
+    100          	uint8_t reg_val;	
+    101                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Read_Reg_0:
+   \   000005 A6 80        LD        A, #0x80
+   \   000007 AE 5200      LDW       X, #0x5200
+   \   00000A CD ....      CALL      L:SPI_GetFlagStatus
+   \   00000D 4A           DEC       A
+   \   00000E 27 F5        JREQ      L:??NRF24L01_Read_Reg_0
+    102           	NRF24L01_NCS_RESET();          //??SPI??
+   \   000010 A6 10        LD        A, #0x10
+   \   000012 AE 5005      LDW       X, #0x5005
+   \   000015 CD ....      CALL      L:GPIO_ResetBits
+    103                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Read_Reg_1:
+   \   000018 A6 02        LD        A, #0x2
+   \   00001A AE 5200      LDW       X, #0x5200
+   \   00001D CD ....      CALL      L:SPI_GetFlagStatus
+   \   000020 A1 00        CP        A, #0x0
+   \   000022 27 F4        JREQ      L:??NRF24L01_Read_Reg_1
+    104            	SPI_SendData(SPI1,reg);   //??????
+   \   000024 B6 ..        LD        A, S:?b8
+   \   000026 AE 5200      LDW       X, #0x5200
+   \   000029 CD ....      CALL      L:SPI_SendData
+    105                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_RXNE) == RESET);
+   \                     ??NRF24L01_Read_Reg_2:
+   \   00002C A6 01        LD        A, #0x1
+   \   00002E AE 5200      LDW       X, #0x5200
+   \   000031 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000034 A1 00        CP        A, #0x0
+   \   000036 27 F4        JREQ      L:??NRF24L01_Read_Reg_2
+    106                  reg_val = SPI_ReceiveData(SPI1);	                        //Dummy data
+   \   000038 AE 5200      LDW       X, #0x5200
+   \   00003B CD ....      CALL      L:SPI_ReceiveData
+    107                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Read_Reg_3:
+   \   00003E A6 02        LD        A, #0x2
+   \   000040 AE 5200      LDW       X, #0x5200
+   \   000043 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000046 A1 00        CP        A, #0x0
+   \   000048 27 F4        JREQ      L:??NRF24L01_Read_Reg_3
+    108                  SPI_SendData(SPI1,NOP);
+   \   00004A A6 FF        LD        A, #0xff
+   \   00004C AE 5200      LDW       X, #0x5200
+   \   00004F CD ....      CALL      L:SPI_SendData
+    109                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_RXNE) == RESET);
+   \                     ??NRF24L01_Read_Reg_4:
+   \   000052 A6 01        LD        A, #0x1
+   \   000054 AE 5200      LDW       X, #0x5200
+   \   000057 CD ....      CALL      L:SPI_GetFlagStatus
+   \   00005A A1 00        CP        A, #0x0
+   \   00005C 27 F4        JREQ      L:??NRF24L01_Read_Reg_4
+    110                  reg_val = SPI_ReceiveData(SPI1);
+   \   00005E AE 5200      LDW       X, #0x5200
+   \   000061 CD ....      CALL      L:SPI_ReceiveData
+   \   000064 B7 ..        LD        S:?b8, A
+    111                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Read_Reg_5:
+   \   000066 A6 80        LD        A, #0x80
+   \   000068 AE 5200      LDW       X, #0x5200
+   \   00006B CD ....      CALL      L:SPI_GetFlagStatus
+   \   00006E 4A           DEC       A
+   \   00006F 27 F5        JREQ      L:??NRF24L01_Read_Reg_5
+    112            	NRF24L01_NCS_SET();          //??SPI??		    
+   \   000071 A6 10        LD        A, #0x10
+   \   000073 AE 5005      LDW       X, #0x5005
+   \   000076 CD ....      CALL      L:GPIO_SetBits
+    113            	return(reg_val);           //?????
+   \   000079 B6 ..        LD        A, S:?b8
+   \   00007B 32 ....      POP       S:?b8
+   \   00007E 81           RET
+    114          }	
+    115          //??????????????
+    116          //reg:???(??)
+    117          //*pBuf:????
+    118          //len:????
+    119          //???,??????????? 
+
+   \                                 In section .near_func.text, align 1
+    120          uint8_t NRF24L01_Read_Buf(uint8_t reg,uint8_t *pBuf,uint8_t len)
+    121          {
+   \                     NRF24L01_Read_Buf:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w6
+   \   000006 3B ....      PUSH      S:?b14
+   \   000009 B7 ..        LD        S:?b10, A
+   \   00000B BF ..        LDW       S:?w4, X
+   \   00000D 45 .. ..     MOV       S:?b14, S:?b0
+    122          	uint8_t status,u8_ctr;	   
+    123                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Read_Buf_0:
+   \   000010 A6 80        LD        A, #0x80
+   \   000012 AE 5200      LDW       X, #0x5200
+   \   000015 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000018 4A           DEC       A
+   \   000019 27 F5        JREQ      L:??NRF24L01_Read_Buf_0
+    124            	NRF24L01_NCS_RESET();           //??SPI??
+   \   00001B A6 10        LD        A, #0x10
+   \   00001D AE 5005      LDW       X, #0x5005
+   \   000020 CD ....      CALL      L:GPIO_ResetBits
+    125                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Read_Buf_1:
+   \   000023 A6 02        LD        A, #0x2
+   \   000025 AE 5200      LDW       X, #0x5200
+   \   000028 CD ....      CALL      L:SPI_GetFlagStatus
+   \   00002B A1 00        CP        A, #0x0
+   \   00002D 27 F4        JREQ      L:??NRF24L01_Read_Buf_1
+    126                  SPI_SendData(SPI1,reg);
+   \   00002F B6 ..        LD        A, S:?b10
+   \   000031 AE 5200      LDW       X, #0x5200
+   \   000034 CD ....      CALL      L:SPI_SendData
+    127                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_RXNE) == RESET);
+   \                     ??NRF24L01_Read_Buf_2:
+   \   000037 A6 01        LD        A, #0x1
+   \   000039 AE 5200      LDW       X, #0x5200
+   \   00003C CD ....      CALL      L:SPI_GetFlagStatus
+   \   00003F A1 00        CP        A, #0x0
+   \   000041 27 F4        JREQ      L:??NRF24L01_Read_Buf_2
+    128                  status = SPI_ReceiveData(SPI1);	                        //Dummy data
+   \   000043 AE 5200      LDW       X, #0x5200
+   \   000046 CD ....      CALL      L:SPI_ReceiveData
+    129                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Read_Buf_3:
+   \   000049 A6 02        LD        A, #0x2
+   \   00004B AE 5200      LDW       X, #0x5200
+   \   00004E CD ....      CALL      L:SPI_GetFlagStatus
+   \   000051 A1 00        CP        A, #0x0
+   \   000053 27 F4        JREQ      L:??NRF24L01_Read_Buf_3
+    130                  SPI_SendData(SPI1,NOP);
+   \   000055 A6 FF        LD        A, #0xff
+   \   000057 AE 5200      LDW       X, #0x5200
+   \   00005A CD ....      CALL      L:SPI_SendData
+    131                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_RXNE) == RESET);
+   \                     ??NRF24L01_Read_Buf_4:
+   \   00005D A6 01        LD        A, #0x1
+   \   00005F AE 5200      LDW       X, #0x5200
+   \   000062 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000065 A1 00        CP        A, #0x0
+   \   000067 27 F4        JREQ      L:??NRF24L01_Read_Buf_4
+    132                  status = SPI_ReceiveData(SPI1);	   
+   \   000069 AE 5200      LDW       X, #0x5200
+   \   00006C CD ....      CALL      L:SPI_ReceiveData
+   \   00006F B7 ..        LD        S:?b13, A
+    133           	for(u8_ctr=0;u8_ctr<len;u8_ctr++)
+   \   000071 3F ..        CLR       S:?b12
+   \   000073 20 38        JRA       L:??NRF24L01_Read_Buf_5
+    134                  {
+    135                    while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Read_Buf_6:
+   \   000075 A6 02        LD        A, #0x2
+   \   000077 AE 5200      LDW       X, #0x5200
+   \   00007A CD ....      CALL      L:SPI_GetFlagStatus
+   \   00007D A1 00        CP        A, #0x0
+   \   00007F 27 F4        JREQ      L:??NRF24L01_Read_Buf_6
+    136                    SPI_SendData(SPI1,NOP);
+   \   000081 A6 FF        LD        A, #0xff
+   \   000083 AE 5200      LDW       X, #0x5200
+   \   000086 CD ....      CALL      L:SPI_SendData
+    137                    while(SPI_GetFlagStatus(SPI1,SPI_FLAG_RXNE) == RESET);
+   \                     ??NRF24L01_Read_Buf_7:
+   \   000089 A6 01        LD        A, #0x1
+   \   00008B AE 5200      LDW       X, #0x5200
+   \   00008E CD ....      CALL      L:SPI_GetFlagStatus
+   \   000091 A1 00        CP        A, #0x0
+   \   000093 27 F4        JREQ      L:??NRF24L01_Read_Buf_7
+    138                    pBuf[u8_ctr] = SPI_ReceiveData(SPI1);//????
+   \   000095 5F           CLRW      X
+   \   000096 B6 ..        LD        A, S:?b12
+   \   000098 97           LD        XL, A
+   \   000099 72BB ....    ADDW      X, S:?w4
+   \   00009D BF ..        LDW       S:?w5, X
+   \   00009F AE 5200      LDW       X, #0x5200
+   \   0000A2 CD ....      CALL      L:SPI_ReceiveData
+   \   0000A5 92C7 ..      LD        [S:?w5.w], A
+    139                  }
+   \   0000A8 B6 ..        LD        A, S:?b12
+   \   0000AA 4C           INC       A
+   \   0000AB B7 ..        LD        S:?b12, A
+   \                     ??NRF24L01_Read_Buf_5:
+   \   0000AD B6 ..        LD        A, S:?b12
+   \   0000AF B1 ..        CP        A, S:?b14
+   \   0000B1 25 C2        JRC       L:??NRF24L01_Read_Buf_6
+    140                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Read_Buf_8:
+   \   0000B3 A6 80        LD        A, #0x80
+   \   0000B5 AE 5200      LDW       X, #0x5200
+   \   0000B8 CD ....      CALL      L:SPI_GetFlagStatus
+   \   0000BB 4A           DEC       A
+   \   0000BC 27 F5        JREQ      L:??NRF24L01_Read_Buf_8
+    141            	NRF24L01_NCS_SET();       //??SPI??
+   \   0000BE A6 10        LD        A, #0x10
+   \   0000C0 AE 5005      LDW       X, #0x5005
+   \   0000C3 CD ....      CALL      L:GPIO_SetBits
+    142            	return status;        //????????
+   \   0000C6 B6 ..        LD        A, S:?b13
+   \   0000C8 32 ....      POP       S:?b14
+   \   0000CB CC ....      JP        L:?epilogue_l2_w6
+    143          }
+    144          //?????????????
+    145          //reg:???(??)
+    146          //*pBuf:????
+    147          //len:????
+    148          //???,???????????
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    149          uint8_t NRF24L01_Write_Buf(uint8_t reg, uint8_t *pBuf, uint8_t len)
+    150          {
+   \                     NRF24L01_Write_Buf:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 3B ....      PUSH      S:?b12
+   \   000006 B7 ..        LD        S:?b10, A
+   \   000008 BF ..        LDW       S:?w4, X
+   \   00000A 45 .. ..     MOV       S:?b12, S:?b0
+    151          	uint8_t status,u8_ctr;	 
+    152                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Write_Buf_0:
+   \   00000D A6 80        LD        A, #0x80
+   \   00000F AE 5200      LDW       X, #0x5200
+   \   000012 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000015 4A           DEC       A
+   \   000016 27 F5        JREQ      L:??NRF24L01_Write_Buf_0
+    153           	NRF24L01_NCS_RESET();          //??SPI??
+   \   000018 A6 10        LD        A, #0x10
+   \   00001A AE 5005      LDW       X, #0x5005
+   \   00001D CD ....      CALL      L:GPIO_ResetBits
+    154                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Write_Buf_1:
+   \   000020 A6 02        LD        A, #0x2
+   \   000022 AE 5200      LDW       X, #0x5200
+   \   000025 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000028 A1 00        CP        A, #0x0
+   \   00002A 27 F4        JREQ      L:??NRF24L01_Write_Buf_1
+    155          	SPI_SendData(SPI1,reg);
+   \   00002C B6 ..        LD        A, S:?b10
+   \   00002E AE 5200      LDW       X, #0x5200
+   \   000031 CD ....      CALL      L:SPI_SendData
+    156                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_RXNE) == RESET);
+   \                     ??NRF24L01_Write_Buf_2:
+   \   000034 A6 01        LD        A, #0x1
+   \   000036 AE 5200      LDW       X, #0x5200
+   \   000039 CD ....      CALL      L:SPI_GetFlagStatus
+   \   00003C A1 00        CP        A, #0x0
+   \   00003E 27 F4        JREQ      L:??NRF24L01_Write_Buf_2
+    157                  status = SPI_ReceiveData(SPI1);
+   \   000040 AE 5200      LDW       X, #0x5200
+   \   000043 CD ....      CALL      L:SPI_ReceiveData
+   \   000046 B7 ..        LD        S:?b11, A
+    158          	for(u8_ctr=0; u8_ctr<len; u8_ctr++)
+   \   000048 3F ..        CLR       S:?b10
+   \   00004A 20 1F        JRA       L:??NRF24L01_Write_Buf_3
+    159                  {
+    160                    while(SPI_GetFlagStatus(SPI1,SPI_FLAG_TXE) == RESET);
+   \                     ??NRF24L01_Write_Buf_4:
+   \   00004C A6 02        LD        A, #0x2
+   \   00004E AE 5200      LDW       X, #0x5200
+   \   000051 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000054 A1 00        CP        A, #0x0
+   \   000056 27 F4        JREQ      L:??NRF24L01_Write_Buf_4
+    161                    SPI_SendData(SPI1,*pBuf++); //????
+   \   000058 92C6 ..      LD        A, [S:?w4.w]
+   \   00005B AE 5200      LDW       X, #0x5200
+   \   00005E CD ....      CALL      L:SPI_SendData
+   \   000061 BE ..        LDW       X, S:?w4
+   \   000063 5C           INCW      X
+   \   000064 BF ..        LDW       S:?w4, X
+    162                  }
+   \   000066 B6 ..        LD        A, S:?b10
+   \   000068 4C           INC       A
+   \   000069 B7 ..        LD        S:?b10, A
+   \                     ??NRF24L01_Write_Buf_3:
+   \   00006B B6 ..        LD        A, S:?b10
+   \   00006D B1 ..        CP        A, S:?b12
+   \   00006F 25 DB        JRC       L:??NRF24L01_Write_Buf_4
+    163                  while(SPI_GetFlagStatus(SPI1,SPI_FLAG_BSY) == SET);
+   \                     ??NRF24L01_Write_Buf_5:
+   \   000071 A6 80        LD        A, #0x80
+   \   000073 AE 5200      LDW       X, #0x5200
+   \   000076 CD ....      CALL      L:SPI_GetFlagStatus
+   \   000079 4A           DEC       A
+   \   00007A 27 F5        JREQ      L:??NRF24L01_Write_Buf_5
+    164          	NRF24L01_NCS_SET();       //??SPI??
+   \   00007C A6 10        LD        A, #0x10
+   \   00007E AE 5005      LDW       X, #0x5005
+   \   000081 CD ....      CALL      L:GPIO_SetBits
+    165          	return status;          //????????
+   \   000084 B6 ..        LD        A, S:?b11
+   \   000086 32 ....      POP       S:?b12
+   \   000089 CC ....      JP        L:?epilogue_l2
+    166          }				   
+    167          //??NRF24L01??????
+    168          //txbuf:????????
+    169          //???:??????
+
+   \                                 In section .near_func.text, align 1
+    170          uint8_t NRF24L01_TxPacket(uint8_t *txbuf)
+    171          {
+   \                     NRF24L01_TxPacket:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 BF ..        LDW       S:?w4, X
+    172          	uint8_t sta;
+    173           //	SPI1_SetSpeed(SPI_BaudRatePrescaler_8);//spi???10.5Mhz(24L01???SPI???10Mhz)   
+    174          	NRF24L01_CE_RESET();
+   \   000005 A6 08        LD        A, #0x8
+   \   000007 AE 5005      LDW       X, #0x5005
+   \   00000A CD ....      CALL      L:GPIO_ResetBits
+    175                  NRF24L01_Write_Buf(WR_TX_PLOAD,txbuf,TX_PLOAD_WIDTH);//????TX BUF  32???
+   \   00000D 35 10 ....   MOV       S:?b0, #0x10
+   \   000011 BE ..        LDW       X, S:?w4
+   \   000013 A6 A0        LD        A, #0xa0
+   \   000015 CD ....      CALL      L:NRF24L01_Write_Buf
+    176           	NRF24L01_CE_SET();	   
+   \   000018 A6 08        LD        A, #0x8
+   \   00001A AE 5005      LDW       X, #0x5005
+   \   00001D CD ....      CALL      L:GPIO_SetBits
+    177          //	while(NRF24L01_ReadIRQ() == SET);//??????
+    178          //	sta=NRF24L01_Read_Reg(STATUS);  //?????????	   
+    179          //	NRF24L01_Write_Reg(NRF_WRITE_REG+STATUS,sta); //??TX_DS?MAX_RT????
+    180          //	if(sta&MAX_TX)//????????
+    181          //	{
+    182          //		NRF24L01_Write_Reg(FLUSH_TX,0xff);//??TX FIFO??? 
+    183          //		return MAX_TX; 
+    184          //	}
+    185          //	if(sta&TX_OK)//????
+    186          //	{
+    187          //		return TX_OK;
+    188          //	}
+    189          	return 0xff;//????????
+   \   000020 A6 FF        LD        A, #0xff
+   \   000022 CC ....      JP        L:?epilogue_w4
+    190          }
+    191          
+    192          //uint8_t NRF24L01_RxPacket(void)
+    193          //{
+    194          //	uint8_t sta;		    							   
+    195          //	//SPI1_SetSpeed(SPI_BaudRatePrescaler_8); //spi???10.5Mhz(24L01???SPI???10Mhz) 
+    196          //       
+    197          //	 
+    198          //        NRF24L01_Read_Buf(RD_RX_PLOAD,nrf_rx_pipe[(sta&0x0e)>>1],RX_PLOAD_WIDTH);//???
+    199          //	if(sta&RX_OK)//?????
+    200          //	{
+    201          //		NRF24L01_Read_Buf(RD_RX_PLOAD,rxbuf,RX_PLOAD_WIDTH);//????
+    202          //		NRF24L01_Write_Reg(FLUSH_RX,0xff);//??RX FIFO??? 
+    203          //		return 0; 
+    204          //	}
+    205          //        NRF24L01_Write_Reg(NRF_WRITE_REG+STATUS,sta); //??TX_DS?MAX_RT????
+    206          //       // NRF24L01_Write_Reg(FLUSH_RX,0xff);//??RX FIFO??? 
+    207          //	return 1;//???????
+    208          //}					    
+    209          
+    210          
+
+   \                                 In section .near_func.text, align 1
+    211          void NRF24L01_RX_Mode(void)
+    212          {
+    213          	NRF24L01_CE_RESET();	  
+   \                     NRF24L01_RX_Mode:
+   \   000000 A6 08        LD        A, #0x8
+   \   000002 AE 5005      LDW       X, #0x5005
+   \   000005 CD ....      CALL      L:GPIO_ResetBits
+    214          	NRF24L01_Write_Buf(NRF_WRITE_REG+RX_ADDR_P0,(uint8_t*)RX_ADDRESS,RX_ADR_WIDTH);//?RX????
+   \   000008 35 05 ....   MOV       S:?b0, #0x5
+   \   00000C AE ....      LDW       X, #RX_ADDRESS
+   \   00000F A6 2A        LD        A, #0x2a
+   \   000011 CD ....      CALL      L:NRF24L01_Write_Buf
+    215          	NRF24L01_Write_Reg(NRF_WRITE_REG+EN_AA,0x01);    //????0?????    
+   \   000014 35 01 ....   MOV       S:?b0, #0x1
+   \   000018 A6 21        LD        A, #0x21
+   \   00001A CD ....      CALL      L:NRF24L01_Write_Reg
+    216          	NRF24L01_Write_Reg(NRF_WRITE_REG+EN_RXADDR,0x01);//????0?????  	 
+   \   00001D 35 01 ....   MOV       S:?b0, #0x1
+   \   000021 A6 22        LD        A, #0x22
+   \   000023 CD ....      CALL      L:NRF24L01_Write_Reg
+    217          	NRF24L01_Write_Reg(NRF_WRITE_REG+RF_CH,0);	     //??RF????		  
+   \   000026 3F ..        CLR       S:?b0
+   \   000028 A6 25        LD        A, #0x25
+   \   00002A CD ....      CALL      L:NRF24L01_Write_Reg
+    218          	NRF24L01_Write_Reg(NRF_WRITE_REG+RX_PW_P0,RX_PLOAD_WIDTH);//????0??????? 	    
+   \   00002D 35 10 ....   MOV       S:?b0, #0x10
+   \   000031 A6 31        LD        A, #0x31
+   \   000033 CD ....      CALL      L:NRF24L01_Write_Reg
+    219          	NRF24L01_Write_Reg(NRF_WRITE_REG+RF_SETUP,0x26);//??TX????,0db??,250kbps,???????   
+   \   000036 35 26 ....   MOV       S:?b0, #0x26
+   \   00003A A6 26        LD        A, #0x26
+   \   00003C CD ....      CALL      L:NRF24L01_Write_Reg
+    220          	NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG, 0x0f);//???????????;PWR_UP,EN_CRC,16BIT_CRC,???? 
+   \   00003F 35 0F ....   MOV       S:?b0, #0xf
+   \   000043 A6 20        LD        A, #0x20
+   \   000045 CD ....      CALL      L:NRF24L01_Write_Reg
+    221          	NRF24L01_CE_SET(); //CE??,?????? 
+   \   000048 A6 08        LD        A, #0x8
+   \   00004A AE 5005      LDW       X, #0x5005
+   \   00004D CC ....      JP        L:GPIO_SetBits
+    222          }						 
+    223           
+    224          
+    225          
+
+   \                                 In section .near_func.text, align 1
+    226          void NRF24L01_TX_Mode(void)
+    227          {														 
+    228          	NRF24L01_CE_RESET();	    
+   \                     NRF24L01_TX_Mode:
+   \   000000 A6 08        LD        A, #0x8
+   \   000002 AE 5005      LDW       X, #0x5005
+   \   000005 CD ....      CALL      L:GPIO_ResetBits
+    229          	NRF24L01_Write_Buf(NRF_WRITE_REG+TX_ADDR,(uint8_t*)TX_ADDRESS,TX_ADR_WIDTH);//?TX???? 
+   \   000008 35 05 ....   MOV       S:?b0, #0x5
+   \   00000C AE ....      LDW       X, #TX_ADDRESS
+   \   00000F A6 30        LD        A, #0x30
+   \   000011 CD ....      CALL      L:NRF24L01_Write_Buf
+    230          	NRF24L01_Write_Buf(NRF_WRITE_REG+RX_ADDR_P0,(uint8_t*)RX_ADDRESS,RX_ADR_WIDTH); //??TX????,??????ACK	  
+   \   000014 35 05 ....   MOV       S:?b0, #0x5
+   \   000018 AE ....      LDW       X, #RX_ADDRESS
+   \   00001B A6 2A        LD        A, #0x2a
+   \   00001D CD ....      CALL      L:NRF24L01_Write_Buf
+    231          
+    232          	NRF24L01_Write_Reg(NRF_WRITE_REG+EN_AA,0x01);     //????0?????    
+   \   000020 35 01 ....   MOV       S:?b0, #0x1
+   \   000024 A6 21        LD        A, #0x21
+   \   000026 CD ....      CALL      L:NRF24L01_Write_Reg
+    233          	NRF24L01_Write_Reg(NRF_WRITE_REG+EN_RXADDR,0x01); //????0?????  
+   \   000029 35 01 ....   MOV       S:?b0, #0x1
+   \   00002D A6 22        LD        A, #0x22
+   \   00002F CD ....      CALL      L:NRF24L01_Write_Reg
+    234          	NRF24L01_Write_Reg(NRF_WRITE_REG+SETUP_RETR,0xfa);//??????????:500us + 86us;????????:10?
+   \   000032 35 FA ....   MOV       S:?b0, #0xfa
+   \   000036 A6 24        LD        A, #0x24
+   \   000038 CD ....      CALL      L:NRF24L01_Write_Reg
+    235          	NRF24L01_Write_Reg(NRF_WRITE_REG+RF_CH,0);       //??RF???40
+   \   00003B 3F ..        CLR       S:?b0
+   \   00003D A6 25        LD        A, #0x25
+   \   00003F CD ....      CALL      L:NRF24L01_Write_Reg
+    236          	NRF24L01_Write_Reg(NRF_WRITE_REG+RF_SETUP,0x26);  //??TX????,0db??,250kbps,???????   
+   \   000042 35 26 ....   MOV       S:?b0, #0x26
+   \   000046 A6 26        LD        A, #0x26
+   \   000048 CD ....      CALL      L:NRF24L01_Write_Reg
+    237          	NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG,0x0e);    //???????????;PWR_UP,EN_CRC,16BIT_CRC,????,??????
+   \   00004B 35 0E ....   MOV       S:?b0, #0xe
+   \   00004F A6 20        LD        A, #0x20
+   \   000051 CD ....      CALL      L:NRF24L01_Write_Reg
+    238          	NRF24L01_CE_SET();//CE??,10us?????
+   \   000054 A6 08        LD        A, #0x8
+   \   000056 AE 5005      LDW       X, #0x5005
+   \   000059 CC ....      JP        L:GPIO_SetBits
+    239          }
+    240          
+    241          /***************************************
+    242          
+    243          *****************************************/
+
+   \                                 In section .near_func.text, align 1
+    244          void NRF24L01_ModeManage(NRF24L01_Mode_TypeDef rf_mode)
+    245          {
+   \                     NRF24L01_ModeManage:
+   \   000000 3B ....      PUSH      S:?b8
+   \   000003 B7 ..        LD        S:?b8, A
+    246            uint8_t temp;
+    247          
+    248            temp = NRF24L01_Read_Reg(NRF_READ_REG + CONFIG);
+   \   000005 4F           CLR       A
+   \   000006 CD ....      CALL      L:NRF24L01_Read_Reg
+   \   000009 B7 ..        LD        S:?b1, A
+    249            
+    250            switch(rf_mode)
+   \   00000B B6 ..        LD        A, S:?b8
+   \   00000D 27 12        JREQ      L:??NRF24L01_ModeManage_0
+   \   00000F 4A           DEC       A
+   \   000010 27 21        JREQ      L:??NRF24L01_ModeManage_1
+   \   000012 4A           DEC       A
+   \   000013 27 58        JREQ      L:??NRF24L01_ModeManage_2
+   \   000015 4A           DEC       A
+   \   000016 27 55        JREQ      L:??NRF24L01_ModeManage_2
+   \   000018 4A           DEC       A
+   \   000019 26 03        JRNE      ??lb_0
+   \   00001B CC ....      JP        L:??NRF24L01_ModeManage_3
+   \                     ??lb_0:
+   \   00001E CC ....      JP        L:??NRF24L01_ModeManage_4
+    251            {
+    252              case NRF24L01_Mode_PowerDown:
+    253                temp &= 0xfd;
+    254                NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG,temp);
+   \                     ??NRF24L01_ModeManage_0:
+   \   000021 B6 ..        LD        A, S:?b1
+   \   000023 A4 FD        AND       A, #0xfd
+   \   000025 B7 ..        LD        S:?b0, A
+   \   000027 A6 20        LD        A, #0x20
+   \   000029 CD ....      CALL      L:NRF24L01_Write_Reg
+    255                nrf_status = NRF24L01_Status_PDN;
+   \   00002C 725F ....    CLR       L:nrf_status
+    256                break;
+   \   000030 CC ....      JP        L:??NRF24L01_ModeManage_4
+    257              case NRF24L01_Mode_StandbyI:
+    258                
+    259                if((temp & 0x02) == 0)    //last mode in power down
+   \                     ??NRF24L01_ModeManage_1:
+   \   000033 B6 ..        LD        A, S:?b1
+   \   000035 AA 02        OR        A, #0x2
+   \   000037 B7 ..        LD        S:?b0, A
+   \   000039 B6 ..        LD        A, S:?b1
+   \   00003B A5 02        BCP       A, #0x2
+   \   00003D 26 12        JRNE      L:??NRF24L01_ModeManage_5
+    260                {
+    261                  temp |= 0x02;
+    262                  NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG,temp);
+   \   00003F A6 20        LD        A, #0x20
+   \   000041 CD ....      CALL      L:NRF24L01_Write_Reg
+    263                  atomTimerDelay(5);
+   \   000044 AE 0005      LDW       X, #0x5
+   \   000047 BF ..        LDW       S:?w1, X
+   \   000049 5F           CLRW      X
+   \   00004A BF ..        LDW       S:?w0, X
+   \   00004C CD ....      CALL      L:atomTimerDelay
+   \   00004F 20 0E        JRA       L:??NRF24L01_ModeManage_6
+    264                }
+    265                else
+    266                {
+    267                  temp |= 0x02;
+    268                  NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG,temp);
+   \                     ??NRF24L01_ModeManage_5:
+   \   000051 A6 20        LD        A, #0x20
+   \   000053 CD ....      CALL      L:NRF24L01_Write_Reg
+    269                  //Delay_Us(200);
+    270                  atomTimerDelay(1);
+   \   000056 5F           CLRW      X
+   \   000057 BF ..        LDW       S:?w0, X
+   \   000059 5C           INCW      X
+   \   00005A BF ..        LDW       S:?w1, X
+   \   00005C CD ....      CALL      L:atomTimerDelay
+    271                }
+    272                NRF24L01_CE_RESET();
+   \                     ??NRF24L01_ModeManage_6:
+   \   00005F A6 08        LD        A, #0x8
+   \   000061 AE 5005      LDW       X, #0x5005
+   \   000064 CD ....      CALL      L:GPIO_ResetBits
+    273                nrf_status = NRF24L01_Status_STANDBY;
+   \   000067 35 01 ....   MOV       L:nrf_status, #0x1
+    274                break;
+   \   00006B 20 5A        JRA       L:??NRF24L01_ModeManage_4
+    275              case NRF24L01_Mode_StandbyII:
+    276              case NRF24L01_Mode_TX:
+    277                
+    278                if((temp & 0x02) == 0)    //last mode in power down
+   \                     ??NRF24L01_ModeManage_2:
+   \   00006D B6 ..        LD        A, S:?b1
+   \   00006F A4 FE        AND       A, #0xfe
+   \   000071 AA 02        OR        A, #0x2
+   \   000073 B7 ..        LD        S:?b0, A
+   \   000075 B6 ..        LD        A, S:?b1
+   \   000077 A5 02        BCP       A, #0x2
+   \   000079 26 10        JRNE      L:??NRF24L01_ModeManage_7
+    279                {
+    280                  temp |= 0x02;
+    281                  temp &= 0xfe;
+    282                  NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG,temp);
+   \   00007B A6 20        LD        A, #0x20
+   \   00007D CD ....      CALL      L:NRF24L01_Write_Reg
+    283                  atomTimerDelay(1);
+   \   000080 5F           CLRW      X
+   \   000081 BF ..        LDW       S:?w0, X
+   \   000083 5C           INCW      X
+   \   000084 BF ..        LDW       S:?w1, X
+   \   000086 CD ....      CALL      L:atomTimerDelay
+   \   000089 20 16        JRA       L:??NRF24L01_ModeManage_8
+    284                }
+    285                else
+    286                {
+    287                  temp |= 0x02;
+    288                  temp &= 0xfe;
+    289                  NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG,temp);
+   \                     ??NRF24L01_ModeManage_7:
+   \   00008B A6 20        LD        A, #0x20
+   \   00008D CD ....      CALL      L:NRF24L01_Write_Reg
+    290                  NRF24L01_CE_SET();
+   \   000090 A6 08        LD        A, #0x8
+   \   000092 AE 5005      LDW       X, #0x5005
+   \   000095 CD ....      CALL      L:GPIO_SetBits
+    291                 // Delay_Us(200);
+    292                  atomTimerDelay(1);
+   \   000098 5F           CLRW      X
+   \   000099 BF ..        LDW       S:?w0, X
+   \   00009B 5C           INCW      X
+   \   00009C BF ..        LDW       S:?w1, X
+   \   00009E CD ....      CALL      L:atomTimerDelay
+    293                }
+    294                
+    295                nrf_status = NRF24L01_Status_TX_IDLE;
+   \                     ??NRF24L01_ModeManage_8:
+   \   0000A1 35 02 ....   MOV       L:nrf_status, #0x2
+    296                break;
+   \   0000A5 20 20        JRA       L:??NRF24L01_ModeManage_4
+    297              case NRF24L01_Mode_RX:
+    298                temp |= 0x03;
+    299                NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG,temp);
+   \                     ??NRF24L01_ModeManage_3:
+   \   0000A7 B6 ..        LD        A, S:?b1
+   \   0000A9 AA 03        OR        A, #0x3
+   \   0000AB B7 ..        LD        S:?b0, A
+   \   0000AD A6 20        LD        A, #0x20
+   \   0000AF CD ....      CALL      L:NRF24L01_Write_Reg
+    300                NRF24L01_CE_SET();
+   \   0000B2 A6 08        LD        A, #0x8
+   \   0000B4 AE 5005      LDW       X, #0x5005
+   \   0000B7 CD ....      CALL      L:GPIO_SetBits
+    301                nrf_status = NRF24L01_Status_RX_IDLE;
+   \   0000BA 35 20 ....   MOV       L:nrf_status, #0x20
+    302                //Delay_Us(200);
+    303                atomTimerDelay(1);
+   \   0000BE 5F           CLRW      X
+   \   0000BF BF ..        LDW       S:?w0, X
+   \   0000C1 5C           INCW      X
+   \   0000C2 BF ..        LDW       S:?w1, X
+   \   0000C4 CD ....      CALL      L:atomTimerDelay
+    304                break;
+    305              default:
+    306              break;
+    307            }
+    308            
+    309            
+    310          }
+   \                     ??NRF24L01_ModeManage_4:
+   \   0000C7 32 ....      POP       S:?b8
+   \   0000CA 81           RET
+    311          
+    312          /***************************************
+    313          rf_channel: 0-63 -> 2.4 + rf_channel x 1MHz
+    314          RF_cont_state: continuous carrier transmit
+    315          *****************************************/
+
+   \                                 In section .near_func.text, align 1
+    316          void NRF24L01_RF_Config(uint8_t rf_channel,NRF24L01_PA_Power_TypeDef pa_power,NRF24L01_DataRate_TypeDef rf_data_rate,FunctionalState RF_cont_state)
+    317          {
+   \                     NRF24L01_RF_Config:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 3B ....      PUSH      S:?b10
+   \   000006 45 .. ..     MOV       S:?b10, S:?b0
+   \   000009 45 .. ..     MOV       S:?b9, S:?b1
+   \   00000C 45 .. ..     MOV       S:?b8, S:?b2
+    318            uint8_t temp = 0x00;
+    319           
+    320            NRF24L01_Write_Reg(NRF_WRITE_REG+RF_CH,rf_channel);
+   \   00000F B7 ..        LD        S:?b0, A
+   \   000011 A6 25        LD        A, #0x25
+   \   000013 CD ....      CALL      L:NRF24L01_Write_Reg
+    321            
+    322            temp |= pa_power;
+    323            temp |= rf_data_rate;
+   \   000016 B6 ..        LD        A, S:?b9
+   \   000018 BA ..        OR        A, S:?b10
+    324            
+    325            if(RF_cont_state)
+   \   00001A 3D ..        TNZ       S:?b8
+   \   00001C 27 04        JREQ      L:??NRF24L01_RF_Config_0
+    326            {
+    327              temp |= 0x80;
+   \   00001E AA 80        OR        A, #0x80
+   \   000020 20 02        JRA       L:??NRF24L01_RF_Config_1
+    328            }
+    329            else
+    330            {
+    331              temp &= 0x7f;
+   \                     ??NRF24L01_RF_Config_0:
+   \   000022 A4 7F        AND       A, #0x7f
+    332            } 
+    333            NRF24L01_Write_Reg(NRF_WRITE_REG+RF_SETUP,temp);
+   \                     ??NRF24L01_RF_Config_1:
+   \   000024 B7 ..        LD        S:?b0, A
+   \   000026 A6 26        LD        A, #0x26
+   \   000028 CD ....      CALL      L:NRF24L01_Write_Reg
+    334          }
+   \   00002B 32 ....      POP       S:?b10
+   \   00002E CC ....      JP        L:?epilogue_w4
+    335          
+    336          
+    337          /*
+    338          for Pipe0 and pipe1, the address is 5 bytes, for pipe2 - pipe5, only LSByte is effective, MSBytes are shared with pipe1
+    339          pipe_rx_bytes : 0-32, 0: pipe not used, 1-32 bytes
+    340          */
+
+   \                                 In section .near_func.text, align 1
+    341          void NRF24L01_DataPipeConfig(NRF24L01_pipe_TypeDef pipe,uint8_t *pipe_rx_address,uint8_t pipe_rx_adr_width,uint8_t pipe_rx_bytes,FunctionalState AutoACK_NewState,FunctionalState PipeNewState)
+    342          {
+   \                     NRF24L01_DataPipeConfig:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 B7 ..        LD        S:?b12, A
+   \   000008 BF ..        LDW       S:?w4, X
+   \   00000A 45 .. ..     MOV       S:?b13, S:?b0
+   \   00000D 45 .. ..     MOV       S:?b14, S:?b1
+   \   000010 45 .. ..     MOV       S:?b10, S:?b2
+   \   000013 45 .. ..     MOV       S:?b11, S:?b3
+    343            uint8_t temp,pipe_index;
+    344            pipe_index = 0x01 << pipe;
+   \   000016 5F           CLRW      X
+   \   000017 5C           INCW      X
+   \   000018 CD ....      CALL      L:?sll16_x_x_a
+   \   00001B 41           EXG       A, XL
+   \   00001C B7 ..        LD        S:?b15, A
+    345            
+    346            temp = NRF24L01_Read_Reg(NRF_READ_REG + EN_AA);
+   \   00001E A6 01        LD        A, #0x1
+   \   000020 CD ....      CALL      L:NRF24L01_Read_Reg
+   \   000023 B7 ..        LD        S:?b0, A
+    347            if(AutoACK_NewState)
+   \   000025 3D ..        TNZ       S:?b10
+   \   000027 27 0D        JREQ      L:??NRF24L01_DataPipeConfig_0
+    348            {
+    349              NRF24L01_Write_Reg(NRF_WRITE_REG+EN_AA, temp | pipe_index);
+   \   000029 B6 ..        LD        A, S:?b15
+   \   00002B BA ..        OR        A, S:?b0
+   \   00002D B7 ..        LD        S:?b0, A
+   \   00002F A6 21        LD        A, #0x21
+   \   000031 CD ....      CALL      L:NRF24L01_Write_Reg
+   \   000034 20 0C        JRA       L:??NRF24L01_DataPipeConfig_1
+    350            }
+    351            else
+    352            {
+    353              NRF24L01_Write_Reg(NRF_WRITE_REG+EN_AA,temp & ~pipe_index);
+   \                     ??NRF24L01_DataPipeConfig_0:
+   \   000036 B6 ..        LD        A, S:?b15
+   \   000038 43           CPL       A
+   \   000039 B4 ..        AND       A, S:?b0
+   \   00003B B7 ..        LD        S:?b0, A
+   \   00003D A6 21        LD        A, #0x21
+   \   00003F CD ....      CALL      L:NRF24L01_Write_Reg
+    354            }
+    355            
+    356            if(pipe < 2)
+   \                     ??NRF24L01_DataPipeConfig_1:
+   \   000042 B6 ..        LD        A, S:?b12
+   \   000044 AB 2A        ADD       A, #0x2a
+   \   000046 B7 ..        LD        S:?b1, A
+   \   000048 B6 ..        LD        A, S:?b12
+   \   00004A A1 02        CP        A, #0x2
+   \   00004C 24 0C        JRNC      L:??NRF24L01_DataPipeConfig_2
+    357            {
+    358              NRF24L01_Write_Buf(NRF_WRITE_REG+RX_ADDR_P0 + pipe,(uint8_t*)pipe_rx_address,pipe_rx_adr_width);
+   \   00004E 45 .. ..     MOV       S:?b0, S:?b13
+   \   000051 BE ..        LDW       X, S:?w4
+   \   000053 B6 ..        LD        A, S:?b1
+   \   000055 CD ....      CALL      L:NRF24L01_Write_Buf
+   \   000058 20 0A        JRA       L:??NRF24L01_DataPipeConfig_3
+    359            }
+    360            else  //only one byte address
+    361            {
+    362              NRF24L01_Write_Reg(NRF_WRITE_REG+RX_ADDR_P0 + pipe,*pipe_rx_address);
+   \                     ??NRF24L01_DataPipeConfig_2:
+   \   00005A 92C6 ..      LD        A, [S:?w4.w]
+   \   00005D B7 ..        LD        S:?b0, A
+   \   00005F B6 ..        LD        A, S:?b1
+   \   000061 CD ....      CALL      L:NRF24L01_Write_Reg
+    363            }
+    364            
+    365            temp = NRF24L01_Read_Reg(NRF_READ_REG + EN_RXADDR);
+   \                     ??NRF24L01_DataPipeConfig_3:
+   \   000064 A6 02        LD        A, #0x2
+   \   000066 CD ....      CALL      L:NRF24L01_Read_Reg
+   \   000069 B7 ..        LD        S:?b8, A
+    366            if(PipeNewState)
+   \   00006B 3D ..        TNZ       S:?b11
+   \   00006D 27 18        JREQ      L:??NRF24L01_DataPipeConfig_4
+    367            {
+    368              NRF24L01_Write_Reg(NRF_WRITE_REG+RX_PW_P0+pipe, pipe_rx_bytes);
+   \   00006F 45 .. ..     MOV       S:?b0, S:?b14
+   \   000072 B6 ..        LD        A, S:?b12
+   \   000074 AB 31        ADD       A, #0x31
+   \   000076 CD ....      CALL      L:NRF24L01_Write_Reg
+    369              NRF24L01_Write_Reg(NRF_WRITE_REG+EN_RXADDR, temp | pipe_index);
+   \   000079 B6 ..        LD        A, S:?b15
+   \   00007B BA ..        OR        A, S:?b8
+   \   00007D B7 ..        LD        S:?b0, A
+   \   00007F A6 22        LD        A, #0x22
+   \   000081 CD ....      CALL      L:NRF24L01_Write_Reg
+   \   000084 CC ....      JP        L:?epilogue_l2_l3
+    370            }
+    371            else
+    372            {
+    373              NRF24L01_Write_Reg(NRF_WRITE_REG+EN_RXADDR,temp & ~pipe_index);
+   \                     ??NRF24L01_DataPipeConfig_4:
+   \   000087 33 ..        CPL       S:?b15
+   \   000089 B6 ..        LD        A, S:?b15
+   \   00008B B4 ..        AND       A, S:?b8
+   \   00008D B7 ..        LD        S:?b0, A
+   \   00008F A6 22        LD        A, #0x22
+   \   000091 CD ....      CALL      L:NRF24L01_Write_Reg
+    374            }
+    375          }
+   \   000094 CC ....      JP        L:?epilogue_l2_l3
+    376          
+
+   \                                 In section .near_func.text, align 1
+    377          void NRF24L01_CRC_Config(NRF24L01_CRC_TypeDef crc,FunctionalState crc_status)
+    378          {
+   \                     NRF24L01_CRC_Config:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 B7 ..        LD        S:?b9, A
+   \   000005 45 .. ..     MOV       S:?b8, S:?b0
+    379            uint8_t temp;
+    380            temp = NRF24L01_Read_Reg(NRF_READ_REG + CONFIG);
+   \   000008 4F           CLR       A
+   \   000009 CD ....      CALL      L:NRF24L01_Read_Reg
+    381            temp &= 0xfb;
+   \   00000C A4 FB        AND       A, #0xfb
+    382            if(crc_status)
+   \   00000E 3D ..        TNZ       S:?b8
+   \   000010 27 06        JREQ      L:??NRF24L01_CRC_Config_0
+    383            {
+    384              temp |= 0x08;
+   \   000012 AA 08        OR        A, #0x8
+   \   000014 B7 ..        LD        S:?b0, A
+   \   000016 20 04        JRA       L:??NRF24L01_CRC_Config_1
+    385            }
+    386            else
+    387            {
+    388              temp &= 0xf7;
+   \                     ??NRF24L01_CRC_Config_0:
+   \   000018 A4 F7        AND       A, #0xf7
+   \   00001A B7 ..        LD        S:?b0, A
+    389            }
+    390            
+    391            NRF24L01_Write_Reg(NRF_WRITE_REG+CONFIG, temp | crc);
+   \                     ??NRF24L01_CRC_Config_1:
+   \   00001C B6 ..        LD        A, S:?b9
+   \   00001E BA ..        OR        A, S:?b0
+   \   000020 B7 ..        LD        S:?b0, A
+   \   000022 A6 20        LD        A, #0x20
+   \   000024 CD ....      CALL      L:NRF24L01_Write_Reg
+    392          }
+   \   000027 CC ....      JP        L:?epilogue_w4
+    393          
+
+   \                                 In section .near_func.text, align 1
+    394          void NRF24L01_SetTX_Address(uint8_t *tx_address,uint8_t tx_adr_width)
+    395          {
+    396            NRF24L01_Write_Buf(NRF_WRITE_REG + TX_ADDR,(uint8_t*)tx_address,tx_adr_width);
+   \                     NRF24L01_SetTX_Address:
+   \   000000 B7 ..        LD        S:?b0, A
+   \   000002 A6 30        LD        A, #0x30
+   \   000004 CC ....      JP        L:NRF24L01_Write_Buf
+    397          }
+    398          
+
+   \                                 In section .near_func.text, align 1
+    399          uint8_t NRF24L01_GetPendingFlags(void)
+    400          {
+    401            uint8_t temp;
+    402            temp = NRF24L01_Read_Reg(NRF_READ_REG + STATUS);
+    403            return(temp&0x70);
+   \                     NRF24L01_GetPendingFlags:
+   \   000000 A6 07        LD        A, #0x7
+   \   000002 CD ....      CALL      L:NRF24L01_Read_Reg
+   \   000005 A4 70        AND       A, #0x70
+   \   000007 81           RET
+    404          }
+    405          
+
+   \                                 In section .near_func.text, align 1
+    406          void NRF24L01_ClearPendingFlag(NRF24L01_Flag_TypeDef rf_flag)
+    407          {
+   \                     NRF24L01_ClearPendingFlag:
+   \   000000 3B ....      PUSH      S:?b8
+   \   000003 B7 ..        LD        S:?b8, A
+    408            uint8_t temp;
+    409            temp = NRF24L01_Read_Reg(NRF_READ_REG + STATUS);
+   \   000005 A6 07        LD        A, #0x7
+   \   000007 CD ....      CALL      L:NRF24L01_Read_Reg
+   \   00000A B7 ..        LD        S:?b0, A
+    410            NRF24L01_Write_Reg(NRF_WRITE_REG+STATUS,temp | rf_flag);
+   \   00000C B6 ..        LD        A, S:?b8
+   \   00000E BA ..        OR        A, S:?b0
+   \   000010 B7 ..        LD        S:?b0, A
+   \   000012 A6 27        LD        A, #0x27
+   \   000014 CD ....      CALL      L:NRF24L01_Write_Reg
+    411          }
+   \   000017 32 ....      POP       S:?b8
+   \   00001A 81           RET
+    412          
+
+   \                                 In section .near_func.text, align 1
+    413          void NRF24L01_IRQHandler(void)
+    414          {
+    415             nrf_flags = NRF24L01_GetPendingFlags(); 
+   \                     NRF24L01_IRQHandler:
+   \   000000 CD ....      CALL      L:NRF24L01_GetPendingFlags
+   \   000003 C7 ....      LD        L:nrf_flags, A
+    416            if(nrf_flags & NRF24L01_Flag_RX_DR)
+   \   000006 720D .... 04 BTJF      L:nrf_flags, #0x6, L:??NRF24L01_IRQHandler_0
+    417            {
+    418              nrf_status = NRF24L01_Status_RX_BUSY;
+   \   00000B 35 40 ....   MOV       L:nrf_status, #0x40
+    419              
+    420            }
+    421            
+    422            if(nrf_flags & NRF24L01_Flag_TX_DS)
+   \                     ??NRF24L01_IRQHandler_0:
+   \   00000F 720B .... 04 BTJF      L:nrf_flags, #0x5, L:??NRF24L01_IRQHandler_1
+    423            {
+    424              nrf_status = NRF24L01_Status_TX_IDLE;
+   \   000014 35 02 ....   MOV       L:nrf_status, #0x2
+    425            }
+    426            
+    427            if(nrf_flags & NRF24L01_Flag_MAX_RT)
+   \                     ??NRF24L01_IRQHandler_1:
+   \   000018 7209 .... 0D BTJF      L:nrf_flags, #0x4, L:??NRF24L01_IRQHandler_2
+    428            {
+    429              nrf_status = NRF24L01_Status_TX_ERROR;
+   \   00001D 35 08 ....   MOV       L:nrf_status, #0x8
+    430              NRF24L01_Write_Reg(FLUSH_TX,0xff);
+   \   000021 35 FF ....   MOV       S:?b0, #0xff
+   \   000025 A6 E1        LD        A, #0xe1
+   \   000027 CD ....      CALL      L:NRF24L01_Write_Reg
+    431            }
+    432            
+    433            if(nrf_flags & NRF24L01_Flag_FIFO_FULL)
+   \                     ??NRF24L01_IRQHandler_2:
+   \   00002A 7201 .... 0D BTJF      L:nrf_flags, #0x0, L:??NRF24L01_IRQHandler_3
+    434            {
+    435              nrf_status = NRF24L01_Status_TX_ERROR;
+   \   00002F 35 08 ....   MOV       L:nrf_status, #0x8
+    436              NRF24L01_Write_Reg(FLUSH_TX,0xff);
+   \   000033 35 FF ....   MOV       S:?b0, #0xff
+   \   000037 A6 E1        LD        A, #0xe1
+   \   000039 CD ....      CALL      L:NRF24L01_Write_Reg
+    437            }
+    438            
+    439            NRF24L01_ClearPendingFlag(NRF24L01_Flag_TX_DS | NRF24L01_Flag_RX_DR | NRF24L01_Flag_MAX_RT);
+   \                     ??NRF24L01_IRQHandler_3:
+   \   00003C A6 70        LD        A, #0x70
+   \   00003E CD ....      CALL      L:NRF24L01_ClearPendingFlag
+    440            nrf_status = NRF24L01_Status_TX_IDLE;
+   \   000041 35 02 ....   MOV       L:nrf_status, #0x2
+    441          }
+   \   000045 81           RET
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      42  NRF24L01_CRC_Config
+      60  NRF24L01_Check
+      27  NRF24L01_ClearPendingFlag
+     151  NRF24L01_DataPipeConfig
+       8  NRF24L01_GetPendingFlags
+      70  NRF24L01_IRQHandler
+     235  NRF24L01_Init
+     203  NRF24L01_ModeManage
+      49  NRF24L01_RF_Config
+      80  NRF24L01_RX_Mode
+     206  NRF24L01_Read_Buf
+     127  NRF24L01_Read_Reg
+       7  NRF24L01_SetTX_Address
+      92  NRF24L01_TX_Mode
+      37  NRF24L01_TxPacket
+     140  NRF24L01_Write_Buf
+     111  NRF24L01_Write_Reg
+       5  RX_ADDRESS
+       5  TX_ADDRESS
+       5  buf
+       1  nrf_flags
+      96  nrf_rx_pipe
+       1  nrf_status
+      96  nrf_tx_pipe
+
+ 
+   194 bytes in section .near.bss
+    15 bytes in section .near.data
+ 1 645 bytes in section .near_func.text
+ 
+ 1 645 bytes of CODE memory
+   209 bytes of DATA memory
+
+Errors: none
+Warnings: 5

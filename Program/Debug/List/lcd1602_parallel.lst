@@ -1,0 +1,449 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 27/Feb/2019  23:34:00
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\User\lcd1602_parallel.c
+#    Command line =  
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\User\lcd1602_parallel.c" -e -Ol --no_cse --no_unroll
+#        --no_inline --no_code_motion --no_tbaa --no_cross_call --debug
+#        --code_model small --data_model medium -o
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\Debug\Obj"
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD -lCN
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\Debug\List" -I
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\AtomOS1.3\kernel\"
+#        -I "C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\AtomOS1.3\ports\stm8\" -I "C:\Users\Wesley\Desktop\JBC\PCB
+#        version\JBC AtomOS\User\" --vregs 16
+#    List file    =  
+#        C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\Debug\List\lcd1602_parallel.lst
+#    Object file  =  
+#        C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\Debug\Obj\lcd1602_parallel.o
+#
+###############################################################################
+
+C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\User\lcd1602_parallel.c
+      1          #include "stm8l15x.h"
+      2          #include "lcd1602_parallel.h"
+      3          #include "atomtimer.h"
+      4          
+
+   \                                 In section .near.data, align 1
+      5          static uint8_t LCD1602_display_status = LCD1602_PARALLEL_REG_FUNCTION;
+   \                     LCD1602_display_status:
+   \   000000 08           DC8 8
+
+   \                                 In section .near.data, align 1
+      6          static uint8_t  LCD1602_cursor_status = LCD1602_PARALLEL_REG_ADDRESS_MODE;
+   \                     LCD1602_cursor_status:
+   \   000000 04           DC8 4
+      7          
+      8          void LCD1602_WriteCommand(uint8_t command);
+      9          void LCD1602_WriteData(uint8_t dat);
+     10          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     11          void LCD1602_Init(void)
+     12          {
+     13            GPIO_Init(LCD1602_DATA_GPIO,GPIO_Pin_All,GPIO_Mode_Out_PP_Low_Slow);
+   \                     LCD1602_Init:
+   \   000000 35 C0 ....   MOV       S:?b0, #0xc0
+   \   000004 A6 FF        LD        A, #0xff
+   \   000006 AE 5014      LDW       X, #0x5014
+   \   000009 CD ....      CALL      L:GPIO_Init
+     14            GPIO_Init(LCD1602_RS_GPIO,LCD1602_RS_PIN,GPIO_Mode_Out_PP_Low_Slow);
+   \   00000C 35 C0 ....   MOV       S:?b0, #0xc0
+   \   000010 A6 40        LD        A, #0x40
+   \   000012 AE 500F      LDW       X, #0x500f
+   \   000015 CD ....      CALL      L:GPIO_Init
+     15            GPIO_Init(LCD1602_RW_GPIO,LCD1602_RW_PIN,GPIO_Mode_Out_PP_Low_Slow);
+   \   000018 35 C0 ....   MOV       S:?b0, #0xc0
+   \   00001C A6 04        LD        A, #0x4
+   \   00001E AE 500F      LDW       X, #0x500f
+   \   000021 CD ....      CALL      L:GPIO_Init
+     16            GPIO_Init(LCD1602_E_GPIO,LCD1602_E_PIN,GPIO_Mode_Out_PP_Low_Slow);
+   \   000024 35 C0 ....   MOV       S:?b0, #0xc0
+   \   000028 A6 08        LD        A, #0x8
+   \   00002A AE 500F      LDW       X, #0x500f
+   \   00002D CD ....      CALL      L:GPIO_Init
+     17            GPIO_Init(LCD1602_LIGHT_GPIO,LCD1602_LIGHT_PIN,GPIO_Mode_Out_PP_Low_Slow);
+   \   000030 35 C0 ....   MOV       S:?b0, #0xc0
+   \   000034 A6 01        LD        A, #0x1
+   \   000036 AE 500F      LDW       X, #0x500f
+   \   000039 CD ....      CALL      L:GPIO_Init
+     18            
+     19            TIM3_OC2Init(TIM3_OCMode_PWM1,TIM3_OutputState_Enable,0,TIM3_OCPolarity_High,TIM3_OCIdleState_Reset);
+   \   00003C 3F ..        CLR       S:?b2
+   \   00003E 3F ..        CLR       S:?b1
+   \   000040 5F           CLRW      X
+   \   000041 35 01 ....   MOV       S:?b0, #0x1
+   \   000045 A6 60        LD        A, #0x60
+   \   000047 CD ....      CALL      L:TIM3_OC2Init
+     20            TIM3_CCxCmd(TIM3_Channel_2,ENABLE);
+   \   00004A 35 01 ....   MOV       S:?b0, #0x1
+   \   00004E A6 01        LD        A, #0x1
+   \   000050 CD ....      CALL      L:TIM3_CCxCmd
+     21            TIM3_CtrlPWMOutputs(ENABLE);
+   \   000053 A6 01        LD        A, #0x1
+   \   000055 CD ....      CALL      L:TIM3_CtrlPWMOutputs
+     22            
+     23            
+     24            atomTimerDelay(15);
+   \   000058 AE 000F      LDW       X, #0xf
+   \   00005B BF ..        LDW       S:?w1, X
+   \   00005D 5F           CLRW      X
+   \   00005E BF ..        LDW       S:?w0, X
+   \   000060 CD ....      CALL      L:atomTimerDelay
+     25            LCD1602_WriteCommand(LCD1602_PARALLEL_CMD_MODE);
+   \   000063 A6 38        LD        A, #0x38
+   \   000065 CD ....      CALL      L:LCD1602_WriteCommand
+     26            atomTimerDelay(5);
+   \   000068 AE 0005      LDW       X, #0x5
+   \   00006B BF ..        LDW       S:?w1, X
+   \   00006D 5F           CLRW      X
+   \   00006E BF ..        LDW       S:?w0, X
+   \   000070 CD ....      CALL      L:atomTimerDelay
+     27            LCD1602_DisplaySwitch(DISABLE);
+   \   000073 4F           CLR       A
+   \   000074 CD ....      CALL      L:LCD1602_DisplaySwitch
+     28            LCD1602_ClearScreen();
+   \   000077 CD ....      CALL      L:LCD1602_ClearScreen
+     29            LCD1602_CursorSwitch(DISABLE);
+   \   00007A 4F           CLR       A
+   \   00007B CD ....      CALL      L:LCD1602_CursorSwitch
+     30            LCD1602_DisplaySwitch(ENABLE);
+   \   00007E A6 01        LD        A, #0x1
+   \   000080 CD ....      CALL      L:LCD1602_DisplaySwitch
+     31            
+     32            LCD1602_BacklightSet(150);
+   \   000083 A6 96        LD        A, #0x96
+   \   000085 CC ....      JP        L:LCD1602_BacklightSet
+     33          }
+     34          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     35          void LCD1602_WriteCommand(uint8_t command)//写指令//
+     36          { 
+   \                     LCD1602_WriteCommand:
+   \   000000 3B ....      PUSH      S:?b8
+   \   000003 B7 ..        LD        S:?b8, A
+     37              GPIO_WriteBit(LCD1602_RS_GPIO,LCD1602_RS_PIN,RESET);
+   \   000005 3F ..        CLR       S:?b0
+   \   000007 A6 40        LD        A, #0x40
+   \   000009 AE 500F      LDW       X, #0x500f
+   \   00000C CD ....      CALL      L:GPIO_WriteBit
+     38              GPIO_WriteBit(LCD1602_E_GPIO,LCD1602_E_PIN,RESET);
+   \   00000F 3F ..        CLR       S:?b0
+   \   000011 A6 08        LD        A, #0x8
+   \   000013 AE 500F      LDW       X, #0x500f
+   \   000016 CD ....      CALL      L:GPIO_WriteBit
+     39              GPIO_Write(LCD1602_DATA_GPIO,command);
+   \   000019 B6 ..        LD        A, S:?b8
+   \   00001B AE 5014      LDW       X, #0x5014
+   \   00001E CD ....      CALL      L:GPIO_Write
+     40              atomTimerDelay(LCD1602_DELAY_TICKS);
+   \   000021 5F           CLRW      X
+   \   000022 BF ..        LDW       S:?w0, X
+   \   000024 5C           INCW      X
+   \   000025 BF ..        LDW       S:?w1, X
+   \   000027 CD ....      CALL      L:atomTimerDelay
+     41              GPIO_WriteBit(LCD1602_E_GPIO,LCD1602_E_PIN,SET);
+   \   00002A 35 01 ....   MOV       S:?b0, #0x1
+   \   00002E A6 08        LD        A, #0x8
+   \   000030 AE 500F      LDW       X, #0x500f
+   \   000033 CD ....      CALL      L:GPIO_WriteBit
+     42             // atomTimerDelay(LCD1602_DELAY_TICKS);
+     43              GPIO_WriteBit(LCD1602_E_GPIO,LCD1602_E_PIN,RESET);
+   \   000036 3F ..        CLR       S:?b0
+   \   000038 A6 08        LD        A, #0x8
+   \   00003A AE 500F      LDW       X, #0x500f
+   \   00003D CD ....      CALL      L:GPIO_WriteBit
+     44          }
+   \   000040 32 ....      POP       S:?b8
+   \   000043 81           RET
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     45          void LCD1602_WriteData(uint8_t dat)//写数据//
+     46          { 
+   \                     LCD1602_WriteData:
+   \   000000 3B ....      PUSH      S:?b8
+   \   000003 B7 ..        LD        S:?b8, A
+     47              
+     48              GPIO_WriteBit(LCD1602_RS_GPIO,LCD1602_RS_PIN,SET);
+   \   000005 35 01 ....   MOV       S:?b0, #0x1
+   \   000009 A6 40        LD        A, #0x40
+   \   00000B AE 500F      LDW       X, #0x500f
+   \   00000E CD ....      CALL      L:GPIO_WriteBit
+     49            //  RW=0;
+     50              GPIO_WriteBit(LCD1602_E_GPIO,LCD1602_E_PIN,RESET);
+   \   000011 3F ..        CLR       S:?b0
+   \   000013 A6 08        LD        A, #0x8
+   \   000015 AE 500F      LDW       X, #0x500f
+   \   000018 CD ....      CALL      L:GPIO_WriteBit
+     51              GPIO_Write(LCD1602_DATA_GPIO,dat);
+   \   00001B B6 ..        LD        A, S:?b8
+   \   00001D AE 5014      LDW       X, #0x5014
+   \   000020 CD ....      CALL      L:GPIO_Write
+     52              atomTimerDelay(LCD1602_DELAY_TICKS);
+   \   000023 5F           CLRW      X
+   \   000024 BF ..        LDW       S:?w0, X
+   \   000026 5C           INCW      X
+   \   000027 BF ..        LDW       S:?w1, X
+   \   000029 CD ....      CALL      L:atomTimerDelay
+     53              GPIO_WriteBit(LCD1602_E_GPIO,LCD1602_E_PIN,SET);
+   \   00002C 35 01 ....   MOV       S:?b0, #0x1
+   \   000030 A6 08        LD        A, #0x8
+   \   000032 AE 500F      LDW       X, #0x500f
+   \   000035 CD ....      CALL      L:GPIO_WriteBit
+     54             // atomTimerDelay(LCD1602_DELAY_TICKS);
+     55              GPIO_WriteBit(LCD1602_E_GPIO,LCD1602_E_PIN,RESET);
+   \   000038 3F ..        CLR       S:?b0
+   \   00003A A6 08        LD        A, #0x8
+   \   00003C AE 500F      LDW       X, #0x500f
+   \   00003F CD ....      CALL      L:GPIO_WriteBit
+     56          }
+   \   000042 32 ....      POP       S:?b8
+   \   000045 81           RET
+     57          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     58          void LCD1602_DisplaySwitch(FunctionalState NewState)
+     59          {
+     60            if(NewState)
+   \                     LCD1602_DisplaySwitch:
+   \   000000 4D           TNZ       A
+   \   000001 27 06        JREQ      L:??LCD1602_DisplaySwitch_0
+     61            {
+     62              LCD1602_display_status |= LCD1602_PARALLEL_REG_FUNCTION_DISPLAY;
+   \   000003 7214 ....    BSET      L:LCD1602_display_status, #0x2
+   \   000007 20 04        JRA       L:??LCD1602_DisplaySwitch_1
+     63            }
+     64            else
+     65            {
+     66              LCD1602_display_status &= ~LCD1602_PARALLEL_REG_FUNCTION_DISPLAY;
+   \                     ??LCD1602_DisplaySwitch_0:
+   \   000009 7215 ....    BRES      L:LCD1602_display_status, #0x2
+     67            } 
+     68            
+     69            LCD1602_WriteCommand(LCD1602_display_status);
+   \                     ??LCD1602_DisplaySwitch_1:
+   \   00000D C6 ....      LD        A, L:LCD1602_display_status
+   \   000010 CC ....      JP        L:LCD1602_WriteCommand
+     70          }
+     71          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     72          void LCD1602_CursorSwitch(FunctionalState NewState)
+     73          {
+     74            if(NewState)
+   \                     LCD1602_CursorSwitch:
+   \   000000 4D           TNZ       A
+   \   000001 27 06        JREQ      L:??LCD1602_CursorSwitch_0
+     75            {
+     76              LCD1602_display_status |= LCD1602_PARALLEL_REG_FUNCTION_CURSOR;
+   \   000003 7212 ....    BSET      L:LCD1602_display_status, #0x1
+   \   000007 20 04        JRA       L:??LCD1602_CursorSwitch_1
+     77            }
+     78            else
+     79            {
+     80              LCD1602_display_status &= ~LCD1602_PARALLEL_REG_FUNCTION_CURSOR;
+   \                     ??LCD1602_CursorSwitch_0:
+   \   000009 7213 ....    BRES      L:LCD1602_display_status, #0x1
+     81            } 
+     82            
+     83            LCD1602_WriteCommand(LCD1602_display_status);
+   \                     ??LCD1602_CursorSwitch_1:
+   \   00000D C6 ....      LD        A, L:LCD1602_display_status
+   \   000010 CC ....      JP        L:LCD1602_WriteCommand
+     84          }
+     85          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     86          void LCD1602_CursorBlinkSwitch(FunctionalState NewState)
+     87          {
+     88            if(NewState)
+   \                     LCD1602_CursorBlinkSwitch:
+   \   000000 4D           TNZ       A
+   \   000001 27 06        JREQ      L:??LCD1602_CursorBlinkSwitch_0
+     89            {
+     90              LCD1602_display_status |= LCD1602_PARALLEL_REG_FUNCTION_BLINK;
+   \   000003 7210 ....    BSET      L:LCD1602_display_status, #0x0
+   \   000007 20 04        JRA       L:??LCD1602_CursorBlinkSwitch_1
+     91            }
+     92            else
+     93            {
+     94              LCD1602_display_status &= ~LCD1602_PARALLEL_REG_FUNCTION_BLINK;
+   \                     ??LCD1602_CursorBlinkSwitch_0:
+   \   000009 7211 ....    BRES      L:LCD1602_display_status, #0x0
+     95            } 
+     96            
+     97            LCD1602_WriteCommand(LCD1602_display_status);
+   \                     ??LCD1602_CursorBlinkSwitch_1:
+   \   00000D C6 ....      LD        A, L:LCD1602_display_status
+   \   000010 CC ....      JP        L:LCD1602_WriteCommand
+     98          }
+     99          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    100          void LCD1602_CursorShiftDirection(Direction NewDirection)
+    101          {
+    102            if(NewDirection)
+   \                     LCD1602_CursorShiftDirection:
+   \   000000 4D           TNZ       A
+   \   000001 27 06        JREQ      L:??LCD1602_CursorShiftDirection_0
+    103            {
+    104              LCD1602_cursor_status |= LCD1602_PARALLEL_REG_ADDRESS_MODE_CURSOR;
+   \   000003 7212 ....    BSET      L:LCD1602_cursor_status, #0x1
+   \   000007 20 04        JRA       L:??LCD1602_CursorShiftDirection_1
+    105            }
+    106            else
+    107            {
+    108              LCD1602_cursor_status &= ~LCD1602_PARALLEL_REG_ADDRESS_MODE_CURSOR;
+   \                     ??LCD1602_CursorShiftDirection_0:
+   \   000009 7213 ....    BRES      L:LCD1602_cursor_status, #0x1
+    109            } 
+    110            
+    111            LCD1602_WriteCommand(LCD1602_cursor_status);
+   \                     ??LCD1602_CursorShiftDirection_1:
+   \   00000D C6 ....      LD        A, L:LCD1602_cursor_status
+   \   000010 CC ....      JP        L:LCD1602_WriteCommand
+    112          }
+    113          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    114          void LCD1602_ScreenShiftDirection(Direction NewDirection)
+    115          {
+    116            if(NewDirection)
+   \                     LCD1602_ScreenShiftDirection:
+   \   000000 4D           TNZ       A
+   \   000001 27 06        JREQ      L:??LCD1602_ScreenShiftDirection_0
+    117            {
+    118              LCD1602_cursor_status |= LCD1602_PARALLEL_REG_ADDRESS_MODE_SHIFT;
+   \   000003 7210 ....    BSET      L:LCD1602_cursor_status, #0x0
+   \   000007 20 04        JRA       L:??LCD1602_ScreenShiftDirection_1
+    119            }
+    120            else
+    121            {
+    122              LCD1602_cursor_status &= ~LCD1602_PARALLEL_REG_ADDRESS_MODE_SHIFT;
+   \                     ??LCD1602_ScreenShiftDirection_0:
+   \   000009 7211 ....    BRES      L:LCD1602_cursor_status, #0x0
+    123            } 
+    124            
+    125            LCD1602_WriteCommand(LCD1602_cursor_status);
+   \                     ??LCD1602_ScreenShiftDirection_1:
+   \   00000D C6 ....      LD        A, L:LCD1602_cursor_status
+   \   000010 CC ....      JP        L:LCD1602_WriteCommand
+    126          }
+    127          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    128          void LCD1602_ClearScreen(void)
+    129          {
+    130            LCD1602_WriteCommand(LCD1602_PARALLEL_CMD_CLEARSCREEN);
+   \                     LCD1602_ClearScreen:
+   \   000000 A6 01        LD        A, #0x1
+   \   000002 CC ....      JP        L:LCD1602_WriteCommand
+    131          }
+    132          
+
+   \                                 In section .near_func.text, align 1
+    133          void LCD1602_DataPointerReset(void)
+    134          {
+    135            LCD1602_WriteCommand(LCD1602_PARALLEL_CMD_PTR_RETURN);
+   \                     LCD1602_DataPointerReset:
+   \   000000 A6 02        LD        A, #0x2
+   \   000002 CC ....      JP        L:LCD1602_WriteCommand
+    136          }
+    137          
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    138          void LCD1602_BacklightSet(uint8_t light_pwm)
+    139          {
+    140            TIM3_SetCompare2(40000*light_pwm/255);
+   \                     LCD1602_BacklightSet:
+   \   000000 5F           CLRW      X
+   \   000001 97           LD        XL, A
+   \   000002 BF ..        LDW       S:?w1, X
+   \   000004 5F           CLRW      X
+   \   000005 BF ..        LDW       S:?w0, X
+   \   000007 CD ....      CALL      L:?mul32_l0_l0_dl
+   \   00000A 00009C40     DC32      0x9c40
+   \   00000E CD ....      CALL      L:?sdiv32_l0_l0_dl
+   \   000011 000000FF     DC32      0xff
+   \   000015 BE ..        LDW       X, S:?w1
+   \   000017 CC ....      JP        L:TIM3_SetCompare2
+    141          }
+    142          
+
+   \                                 In section .near_func.text, align 1
+    143          void LCD1602_DisplayString(uint8_t x,uint8_t y,uint8_t *p)//显示//
+    144          {
+   \                     LCD1602_DisplayString:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 B7 ..        LD        S:?b1, A
+   \   000005 BF ..        LDW       S:?w4, X
+    145            LCD1602_WriteCommand(LCD1602_PARALLEL_REG_DATA_ADDRESS + x + y*64);
+   \   000007 A6 40        LD        A, #0x40
+   \   000009 97           LD        XL, A
+   \   00000A B6 ..        LD        A, S:?b0
+   \   00000C 42           MUL       X, A
+   \   00000D 9F           LD        A, XL
+   \   00000E BB ..        ADD       A, S:?b1
+   \   000010 AB 80        ADD       A, #0x80
+   \   000012 CD ....      CALL      L:LCD1602_WriteCommand
+   \   000015 20 0D        JRA       L:??LCD1602_DisplayString_0
+    146              while(*p!='\0')
+    147              {
+    148                LCD1602_WriteData(*p);
+   \                     ??LCD1602_DisplayString_1:
+   \   000017 92C6 ..      LD        A, [S:?w4.w]
+   \   00001A CD ....      CALL      L:LCD1602_WriteData
+    149                p++;
+   \   00001D BE ..        LDW       X, S:?w4
+   \   00001F 1C 0001      ADDW      X, #0x1
+   \   000022 BF ..        LDW       S:?w4, X
+    150                //atomTimerDelay(1);
+    151              }
+   \                     ??LCD1602_DisplayString_0:
+   \   000024 923D ..      TNZ       [S:?w4.w]
+   \   000027 26 EE        JRNE      L:??LCD1602_DisplayString_1
+    152          }
+   \   000029 CC ....      JP        L:?epilogue_w4
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      26  LCD1602_BacklightSet
+       5  LCD1602_ClearScreen
+      19  LCD1602_CursorBlinkSwitch
+      19  LCD1602_CursorShiftDirection
+      19  LCD1602_CursorSwitch
+       5  LCD1602_DataPointerReset
+      44  LCD1602_DisplayString
+      19  LCD1602_DisplaySwitch
+     136  LCD1602_Init
+      19  LCD1602_ScreenShiftDirection
+      68  LCD1602_WriteCommand
+      70  LCD1602_WriteData
+       1  LCD1602_cursor_status
+       1  LCD1602_display_status
+
+ 
+   2 bytes in section .near.data
+ 449 bytes in section .near_func.text
+ 
+ 449 bytes of CODE memory
+   2 bytes of DATA memory
+
+Errors: none
+Warnings: 1

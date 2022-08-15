@@ -1,0 +1,117 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:16
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\User\PPM.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\PPM.c" -e -Om --no_unroll
+#        --no_inline --no_tbaa --no_cross_call --debug --code_model small
+#        --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\PPM.lst
+#    Object file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\PPM.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\User\PPM.c
+      1          #include "stm8l15x.h"
+      2          #include "ppm.h"
+      3          
+      4          #define pulse_0p3_ms 1200
+      5          #define pulse_0p4_ms 1600
+      6          #define pulse_2_ms 8000
+      7          //---------------
+
+   \                                 In section .near.bss, align 1
+      8          uint16_t Channel_data[9] = {0};//start pulse(0.4ms) 8 channel 
+   \                     Channel_data:
+   \   000000              DS8 18
+      9          
+
+   \                                 In section .near_func.text, align 1
+     10          void PPM_Init(void)
+     11          {
+     12            GPIO_Init(PPM_GPIO,PPM_PIN,GPIO_Mode_Out_PP_High_Slow);
+   \                     PPM_Init:
+   \   000000 35 D0 ....   MOV       S:?b0, #0xd0
+   \   000004 A6 01        LD        A, #0x1
+   \   000006 AE 500F      LDW       X, #0x500f
+   \   000009 CD ....      CALL      L:GPIO_Init
+     13            CLK_PeripheralClockConfig(CLK_Peripheral_TIM3,ENABLE);
+   \   00000C 35 01 ....   MOV       S:?b0, #0x1
+   \   000010 A6 01        LD        A, #0x1
+   \   000012 CD ....      CALL      L:CLK_PeripheralClockConfig
+     14            TIM3_DeInit();
+   \   000015 CD ....      CALL      L:TIM3_DeInit
+     15            TIM3_TimeBaseInit(TIM3_Prescaler_4,TIM3_CounterMode_Up,16000); //250hz, low 2ms,high 2ms
+   \   000018 AE 3E80      LDW       X, #0x3e80
+   \   00001B 3F ..        CLR       S:?b0
+   \   00001D A6 02        LD        A, #0x2
+   \   00001F CD ....      CALL      L:TIM3_TimeBaseInit
+     16            TIM3_OC2Init(TIM3_OCMode_PWM1,TIM3_OutputState_Enable,8000,TIM3_OCPolarity_High,TIM3_OCIdleState_Reset);
+   \   000022 3F ..        CLR       S:?b2
+   \   000024 3F ..        CLR       S:?b1
+   \   000026 AE 1F40      LDW       X, #0x1f40
+   \   000029 35 01 ....   MOV       S:?b0, #0x1
+   \   00002D A6 60        LD        A, #0x60
+   \   00002F CD ....      CALL      L:TIM3_OC2Init
+     17            TIM3_CtrlPWMOutputs(ENABLE);
+   \   000032 A6 01        LD        A, #0x1
+   \   000034 CD ....      CALL      L:TIM3_CtrlPWMOutputs
+     18            TIM3_CCxCmd(TIM3_Channel_2,ENABLE);
+   \   000037 35 01 ....   MOV       S:?b0, #0x1
+   \   00003B A6 01        LD        A, #0x1
+   \   00003D CD ....      CALL      L:TIM3_CCxCmd
+     19            TIM3_SelectOnePulseMode(TIM3_OPMode_Single);
+   \   000040 A6 01        LD        A, #0x1
+   \   000042 CD ....      CALL      L:TIM3_SelectOnePulseMode
+     20            TIM3_Cmd(ENABLE);
+   \   000045 A6 01        LD        A, #0x1
+   \   000047 CD ....      CALL      L:TIM3_Cmd
+     21            
+     22            Channel_data[0] = pulse_0p4_ms; //0.4ms start pulse
+   \   00004A AE 0640      LDW       X, #0x640
+   \   00004D CF ....      LDW       L:Channel_data, X
+     23            Channel_data[0] = 1200; //0.3ms start pulse
+   \   000050 AE 04B0      LDW       X, #0x4b0
+   \   000053 CF ....      LDW       L:Channel_data, X
+     24            
+     25          }
+   \   000056 81           RET
+     26          
+
+   \                                 In section .near_func.text, align 1
+     27          void PPM_Update(uint16_t *ptr)
+     28          {
+     29            
+     30          }
+   \                     PPM_Update:
+   \   000000 81           RET
+     31          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      18  Channel_data
+      87  PPM_Init
+       1  PPM_Update
+
+ 
+ 18 bytes in section .near.bss
+ 88 bytes in section .near_func.text
+ 
+ 88 bytes of CODE memory
+ 18 bytes of DATA memory
+
+Errors: none
+Warnings: none

@@ -1,0 +1,217 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 23/Jun/2020  23:07:47
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\User\Joystick.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\Joystick.c" -e -Om
+#        --no_unroll --no_inline --no_tbaa --no_cross_call --debug --code_model
+#        small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\Joystick.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\Joystick.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\User\Joystick.c
+      1          #include "stm8l15x.h"
+      2          #include "joystick.h"
+      3          
+      4          
+
+   \                                 In section .near.bss, align 1
+      5          Channel_Typedef JoystickChannel[8];
+   \                     JoystickChannel:
+   \   000000              DS8 48
+      6          
+
+   \                                 In section .near_func.text, align 1
+      7          void JoystickInit(void)
+      8          {
+      9            
+     10            JoystickChannel[0].JoystickType = NoneAutoCenterType;
+   \                     JoystickInit:
+   \   000000 35 01 ....   MOV       L:JoystickChannel, #0x1
+     11            JoystickChannel[1].JoystickType = AutoCenterType;
+   \   000004 725F ....    CLR       L:JoystickChannel + 6
+     12            JoystickChannel[2].JoystickType = AutoCenterType;
+   \   000008 725F ....    CLR       L:JoystickChannel + 12
+     13            JoystickChannel[3].JoystickType = AutoCenterType;
+   \   00000C 725F ....    CLR       L:JoystickChannel + 18
+     14            JoystickChannel[4].JoystickType = AutoCenterType;
+   \   000010 725F ....    CLR       L:JoystickChannel + 24
+     15            JoystickChannel[5].JoystickType = AutoCenterType;
+   \   000014 725F ....    CLR       L:JoystickChannel + 30
+     16            JoystickChannel[6].JoystickType = AutoCenterType;
+   \   000018 725F ....    CLR       L:JoystickChannel + 36
+     17            JoystickChannel[7].JoystickType = AutoCenterType;
+   \   00001C 725F ....    CLR       L:JoystickChannel + 42
+     18          }
+   \   000020 81           RET
+     19          //-----------convert 0-4096 ADC data to 0-8000 
+
+   \                                 In section .near_func.text, align 1
+     20          uint16_t JOYSTICK_Update(uint16_t *p,Joystick_Typedef ctype,FlagStatus reverse)
+     21          {
+     22            uint16_t temp;
+     23            switch(ctype)
+   \                     JOYSTICK_Update:
+   \   000000 4D           TNZ       A
+   \   000001 27 05        JREQ      L:??JOYSTICK_Update_0
+   \   000003 4A           DEC       A
+   \   000004 27 37        JREQ      L:??JOYSTICK_Update_1
+   \   000006 20 4B        JRA       L:??JOYSTICK_Update_2
+     24            {
+     25            case AutoCenterType:
+     26              if((*p < 2048+CENTER_POSITION_DEBOUNCE) && (*p > 2048-CENTER_POSITION_DEBOUNCE))
+   \                     ??JOYSTICK_Update_0:
+   \   000008 FE           LDW       X, (X)
+   \   000009 9093         LDW       Y, X
+   \   00000B 72A9 F89A    ADDW      Y, #0xf89a
+   \   00000F 90A3 0135    CPW       Y, #0x135
+   \   000013 24 03        JRNC      L:??JOYSTICK_Update_3
+     27              {
+     28                temp = 0;
+     29                temp &= 0x7fff; //positive value flag
+   \   000015 5F           CLRW      X
+   \   000016 20 1D        JRA       L:??JOYSTICK_Update_4
+     30              }
+     31              else
+     32              {
+     33                if(*p > 2048+CENTER_POSITION_DEBOUNCE)
+   \                     ??JOYSTICK_Update_3:
+   \   000018 A3 089C      CPW       X, #0x89c
+   \   00001B 25 09        JRC       L:??JOYSTICK_Update_5
+     34                {
+     35                   temp= *p - 2048 - CENTER_POSITION_DEBOUNCE;
+     36                   temp &= 0x7fff; //positive value flag
+   \   00001D 1C F765      ADDW      X, #0xf765
+   \   000020 02           RLWA      X, A
+   \   000021 A4 7F        AND       A, #0x7f
+   \   000023 01           RRWA      X, A
+   \   000024 20 0F        JRA       L:??JOYSTICK_Update_4
+     37                }
+     38                else
+     39                {
+     40                  temp = 2048-CENTER_POSITION_DEBOUNCE-*p;
+     41                  temp |= CHANNEL_NEGATIVE_SIGN; //negative value flag
+   \                     ??JOYSTICK_Update_5:
+   \   000026 90AE 0765    LDW       Y, #0x765
+   \   00002A BF ..        LDW       S:?w1, X
+   \   00002C 93           LDW       X, Y
+   \   00002D 72B0 ....    SUBW      X, S:?w1
+   \   000031 02           RLWA      X, A
+   \   000032 AA 80        OR        A, #0x80
+   \   000034 01           RRWA      X, A
+     42                }
+     43                
+     44              }
+     45              temp |= AUTO_ZERO_TYPE;
+   \                     ??JOYSTICK_Update_4:
+   \   000035 02           RLWA      X, A
+   \   000036 AA 40        OR        A, #0x40
+   \   000038 01           RRWA      X, A
+   \   000039 9093         LDW       Y, X
+     46              
+     47              break;
+   \   00003B 20 16        JRA       L:??JOYSTICK_Update_2
+     48            case NoneAutoCenterType:
+     49              if(*p < ZERO_POSITION_DEBOUNCE)
+   \                     ??JOYSTICK_Update_1:
+   \   00003D FE           LDW       X, (X)
+   \   00003E A3 0002      CPW       X, #0x2
+   \   000041 24 03        JRNC      L:??JOYSTICK_Update_6
+     50              {
+     51                temp = 0;
+   \   000043 5F           CLRW      X
+   \   000044 20 07        JRA       L:??JOYSTICK_Update_7
+     52              }
+     53              else
+     54              {
+     55                temp = *p - ZERO_POSITION_DEBOUNCE;
+     56                temp &= 0x7fff; //positive value flag
+   \                     ??JOYSTICK_Update_6:
+   \   000046 1C FFFE      ADDW      X, #0xfffe
+   \   000049 02           RLWA      X, A
+   \   00004A A4 7F        AND       A, #0x7f
+   \   00004C 01           RRWA      X, A
+     57              }
+     58              temp &= ~AUTO_ZERO_TYPE;
+   \                     ??JOYSTICK_Update_7:
+   \   00004D 02           RLWA      X, A
+   \   00004E A4 BF        AND       A, #0xbf
+   \   000050 01           RRWA      X, A
+   \   000051 9093         LDW       Y, X
+     59              break;
+     60            default:
+     61              break;
+     62            }
+     63            
+     64            if(reverse)
+   \                     ??JOYSTICK_Update_2:
+   \   000053 3D ..        TNZ       S:?b0
+   \   000055 27 18        JREQ      L:??JOYSTICK_Update_8
+     65            {
+     66              if(temp & CHANNEL_NEGATIVE_SIGN)
+   \   000057 93           LDW       X, Y
+   \   000058 02           RLWA      X, A
+   \   000059 A4 80        AND       A, #0x80
+   \   00005B 02           RLWA      X, A
+   \   00005C 4F           CLR       A
+   \   00005D 02           RLWA      X, A
+   \   00005E 5D           TNZW      X
+   \   00005F 27 08        JREQ      L:??JOYSTICK_Update_9
+     67              {
+     68                temp &= 0x7fff;
+   \   000061 51           EXGW      X, Y
+   \   000062 02           RLWA      X, A
+   \   000063 A4 7F        AND       A, #0x7f
+   \   000065 01           RRWA      X, A
+   \   000066 51           EXGW      X, Y
+   \   000067 20 06        JRA       L:??JOYSTICK_Update_8
+     69              }
+     70              else
+     71              {
+     72                temp |= CHANNEL_NEGATIVE_SIGN;
+   \                     ??JOYSTICK_Update_9:
+   \   000069 51           EXGW      X, Y
+   \   00006A 02           RLWA      X, A
+   \   00006B AA 80        OR        A, #0x80
+   \   00006D 01           RRWA      X, A
+   \   00006E 51           EXGW      X, Y
+     73              }
+     74            }
+     75            return(temp);
+   \                     ??JOYSTICK_Update_8:
+   \   00006F 93           LDW       X, Y
+   \   000070 81           RET
+     76          }
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+     113  JOYSTICK_Update
+      48  JoystickChannel
+      33  JoystickInit
+
+ 
+  48 bytes in section .near.bss
+ 146 bytes in section .near_func.text
+ 
+ 146 bytes of CODE memory
+  48 bytes of DATA memory
+
+Errors: none
+Warnings: none

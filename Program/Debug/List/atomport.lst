@@ -1,0 +1,453 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:15
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\atomport.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\AtomOS1.3\ports\stm8\atomport.c" -e -Om --no_unroll
+#        --no_inline --no_tbaa --no_cross_call --debug --code_model small
+#        --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\atomport.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\atomport.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\atomport.c
+      1          /*
+      2           * Copyright (c) 2010, Kelvin Lawson. All rights reserved.
+      3           *
+      4           * Redistribution and use in source and binary forms, with or without
+      5           * modification, are permitted provided that the following conditions
+      6           * are met:
+      7           *
+      8           * 1. Redistributions of source code must retain the above copyright
+      9           *    notice, this list of conditions and the following disclaimer.
+     10           * 2. Redistributions in binary form must reproduce the above copyright
+     11           *    notice, this list of conditions and the following disclaimer in the
+     12           *    documentation and/or other materials provided with the distribution.
+     13           * 3. No personal names or organizations' names associated with the
+     14           *    Atomthreads project may be used to endorse or promote products
+     15           *    derived from this software without specific prior written permission.
+     16           *
+     17           * THIS SOFTWARE IS PROVIDED BY THE ATOMTHREADS PROJECT AND CONTRIBUTORS
+     18           * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+     19           * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     20           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE
+     21           * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     22           * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     23           * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     24           * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     25           * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     26           * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     27           * POSSIBILITY OF SUCH DAMAGE.
+     28           */
+     29          
+     30          
+     31          #include "atom.h"
+     32          #include "atomport-private.h"
+     33          #include "stm8l15x_tim4.h"
+     34          #if defined(__RCSTM8__)
+     35          #include <intrins.h>
+     36          #endif
+     37          
+     38          
+     39          /** Forward declarations */
+     40          static NO_REG_SAVE void thread_shell (void);
+     41          
+     42          
+     43          /**
+     44           * \b thread_shell
+     45           *
+     46           * Shell routine which is used to call all thread entry points.
+     47           *
+     48           * This routine is called whenever a new thread is starting, and is
+     49           * responsible for taking the entry point parameter off the TCB
+     50           * and passing this into the thread entry point, as well as enabling
+     51           * interrupts.
+     52           *
+     53           * This is an optional function for a port, because interrupts could
+     54           * be enabled by the first-thread and normal context restore routines,
+     55           * but that would require special handling in the normal context
+     56           * switch routine (archContextSwitch()) that is only needed the first
+     57           * time a thread is started. A much neater method is to direct all
+     58           * threads through this shell routine first, so that interrupts will
+     59           * always be enabled at thread startup, and no special first-time-run
+     60           * handling is required in the context restore routines (i.e. we
+     61           * don't affect normal context switch times just for the benefit of
+     62           * the first time a thread is restored by adding extra complication
+     63           * to the thread restore routines).
+     64           *
+     65           * Other ports are free to implement whatever scheme they wish. In
+     66           * particular if you save all necessary registers (including the
+     67           * interrupt enable register) on a context switch then you need not
+     68           * worry about any special requirements for starting threads for the
+     69           * first time because you can preinitialise the stack context with
+     70           * a suitable register value that will enable interrupts.
+     71           *
+     72           * If the compiler supports it, stack space can be saved by preventing
+     73           * the function from saving registers on entry. This is because we
+     74           * are called directly by the context-switch assembler, and know that
+     75           * threads cannot return from here. The NO_REG_SAVE macro is used to
+     76           * denote such functions in a compiler-agnostic way, though not all
+     77           * compilers support it.
+     78           *
+     79           * @return None
+     80           */
+
+   \                                 In section .near_func.text, align 1
+     81          static NO_REG_SAVE void thread_shell (void)
+     82          {
+     83              ATOM_TCB *curr_tcb;
+     84          
+     85              /* Get the TCB of the thread being started */
+     86              curr_tcb = atomCurrentContext();
+   \                     thread_shell:
+   \   000000 CD ....      CALL      L:atomCurrentContext
+     87          
+     88              /**
+     89               * Enable interrupts - these will not be enabled when a thread
+     90               * is first restored.
+     91               */
+     92          #if defined(__CSMC__)
+     93              _asm("rim");
+     94          #elif defined(__IAR_SYSTEMS_ICC__)
+     95              rim();
+   \   000003 9A           RIM
+     96          #elif defined(__RCSTM8__)
+     97              _rim_();
+     98          #elif defined(__SDCC_stm8)
+     99          	__asm__("rim");
+    100          #endif
+    101          
+    102              /* Call the thread entry point */
+    103              if (curr_tcb && curr_tcb->entry_point)
+   \   000004 5D           TNZW      X
+   \   000005 27 12        JREQ      L:??thread_shell_0
+   \   000007 9093         LDW       Y, X
+   \   000009 72A9 0003    ADDW      Y, #0x3
+   \   00000D 90FE         LDW       Y, (Y)
+   \   00000F 27 08        JREQ      L:??thread_shell_0
+    104              {
+    105                  curr_tcb->entry_point(curr_tcb->entry_param);
+   \   000011 1C 0005      ADDW      X, #0x5
+   \   000014 CD ....      CALL      L:?load32_l0_0x
+   \   000017 90FD         CALL      (Y)
+    106              }
+    107          
+    108              /* Not reached - threads should never return from the entry point */
+    109          
+    110          }
+   \                     ??thread_shell_0:
+   \   000019 81           RET
+    111          
+    112          
+    113          /**
+    114           * \b archThreadContextInit
+    115           *
+    116           * Architecture-specific thread context initialisation routine.
+    117           *
+    118           * This function must set up a thread's context ready for restoring
+    119           * and running the thread via archFirstThreadRestore() or
+    120           * archContextSwitch().
+    121           *
+    122           * (COSMIC & RAISONANCE) On this port we take advantage of the fact
+    123           * that when the context switch routine is called these compilers will
+    124           * automatically stack all registers which should not be clobbered.
+    125           * This means that the context switch need only save and restore the
+    126           * stack pointer, which is stored in the thread's TCB. Because of
+    127           * this, it is not necessary to prefill a new thread's stack with any
+    128           * register values here. The only entry we need to make in the stack
+    129           * is the thread's entry point - this is not exactly restored when
+    130           * the thread is context switched in, but rather is popped off the
+    131           * stack by the context switch routine's RET call. That is used to
+    132           * direct the program counter to our thread's entry point - we are
+    133           * faking a return to a caller which never actually existed.
+    134           *
+    135           * (IAR) The IAR compiler works around the lack of CPU registers on
+    136           * STM8 by allocating some space in low SRAM which is used for
+    137           * "virtual" registers. The compiler uses these like normal CPU
+    138           * registers, and hence their values must be preserved when
+    139           * context-switching between threads. Some of these (?b8 to ?b15)
+    140           * are expected to be preserved by called functions, and hence we
+    141           * actually need to save/restore those registers (unlike the rest
+    142           * of the virtual registers and the standard CPU registers). We
+    143           * therefore must prefill the stack with values for ?b8 to ?b15
+    144           * here.
+    145           *
+    146           * We could pre-initialise the stack so that the RET call goes
+    147           * directly to the thread entry point, with the thread entry
+    148           * parameter filled in. On this architecture, however, we use an
+    149           * outer thread shell routine which is used to call all threads.
+    150           * The thread entry point and parameter are stored in the thread's
+    151           * TCB which the thread shell uses to make the actual call to the
+    152           * entry point. We don't therefore need to store the actual thread
+    153           * entry and parameter within the stack.
+    154           *
+    155           * Note that interrupts must be enabled the first time a thread is
+    156           * run. On some architectures this might be done by setting an
+    157           * initial value for the interrupt-enable register within the stack
+    158           * area. In this port, however, we use the thread shell to enable
+    159           * interrupts at the start of any thread.
+    160           *
+    161           * @param[in] tcb_ptr Pointer to the TCB of the thread being created
+    162           * @param[in] stack_top Pointer to the top of the new thread's stack
+    163           * @param[in] entry_point Pointer to the thread entry point function
+    164           * @param[in] entry_param Parameter to be passed to the thread entry point
+    165           *
+    166           * @return None
+    167           */
+
+   \                                 In section .near_func.text, align 1
+    168          void archThreadContextInit (ATOM_TCB *tcb_ptr, void *stack_top, void (*entry_point)(uint32_t), uint32_t entry_param)
+    169          {
+   \                     archThreadContextInit:
+   \   000000 BF ..        LDW       S:?w0, X
+    170              uint8_t *stack_ptr;
+    171          
+    172              /** Start at stack top */
+    173              stack_ptr = (uint8_t *)stack_top;
+    174          
+    175              /**
+    176               * The thread restore routines will perform a RET which expects to
+    177               * find the address of the calling routine on the stack. In this case
+    178               * (the first time a thread is run) we "return" to the entry point for
+    179               * the thread. That is, we store the thread entry point in the
+    180               * place that RET will look for the return address: the stack.
+    181               *
+    182               * Note that we are using the thread_shell() routine to start all
+    183               * threads, so we actually store the address of thread_shell()
+    184               * here. Other ports may store the real thread entry point here
+    185               * and call it directly from the thread restore routines.
+    186               *
+    187               * Because we are filling the stack from top to bottom, this goes
+    188               * on the stack first (at the top).
+    189               */
+    190              *stack_ptr-- = (uint8_t)((uint16_t)thread_shell & 0xFF);
+   \   000002 AE ....      LDW       X, #thread_shell
+   \   000005 9F           LD        A, XL
+   \   000006 90F7         LD        (Y), A
+   \   000008 93           LDW       X, Y
+   \   000009 5A           DECW      X
+   \   00000A 9093         LDW       Y, X
+    191              *stack_ptr-- = (uint8_t)(((uint16_t)thread_shell >> 8) & 0xFF);
+   \   00000C AE ....      LDW       X, #thread_shell
+   \   00000F 9E           LD        A, XH
+   \   000010 90F7         LD        (Y), A
+   \   000012 93           LDW       X, Y
+   \   000013 5A           DECW      X
+    192          
+    193              /**
+    194               * Because we are using a thread shell which is responsible for
+    195               * calling the real entry point, it also passes the parameters
+    196               * to entry point and we need not stack the entry parameter here.
+    197               *
+    198               * Other ports may wish to store entry_param in the appropriate
+    199               * parameter registers when creating a thread's context,
+    200               * particularly if that port saves those registers anyway.
+    201               */
+    202          
+    203              /**
+    204               * (IAR) Set up initial values for ?b8 to ?b15.
+    205               */
+    206          #if defined(__IAR_SYSTEMS_ICC__)
+    207              *stack_ptr-- = 0;    // ?b8
+   \   000014 4F           CLR       A
+   \   000015 F7           LD        (X), A
+   \   000016 5A           DECW      X
+    208              *stack_ptr-- = 0;    // ?b9
+   \   000017 F7           LD        (X), A
+   \   000018 5A           DECW      X
+    209              *stack_ptr-- = 0;    // ?b10
+   \   000019 F7           LD        (X), A
+   \   00001A 5A           DECW      X
+    210              *stack_ptr-- = 0;    // ?b11
+   \   00001B F7           LD        (X), A
+   \   00001C 5A           DECW      X
+    211              *stack_ptr-- = 0;    // ?b12
+   \   00001D F7           LD        (X), A
+   \   00001E 5A           DECW      X
+    212              *stack_ptr-- = 0;    // ?b13
+   \   00001F F7           LD        (X), A
+   \   000020 5A           DECW      X
+    213              *stack_ptr-- = 0;    // ?b14
+   \   000021 F7           LD        (X), A
+   \   000022 5A           DECW      X
+    214              *stack_ptr-- = 0;    // ?b15
+   \   000023 F7           LD        (X), A
+    215          #endif
+    216          
+    217              /**
+    218               * (COSMIC & RAISONANCE) We do not initialise any registers via the
+    219               * initial stack context at all.
+    220               */
+    221          
+    222              /**
+    223               * All thread context has now been initialised. All that is left
+    224               * is to save the current stack pointer to the thread's TCB so
+    225               * that it knows where to start looking when the thread is started.
+    226               */
+    227              tcb_ptr->sp_save_ptr = stack_ptr;
+   \   000024 5A           DECW      X
+   \   000025 92CF ..      LDW       [S:?w0.w], X
+    228          
+    229          }
+   \   000028 81           RET
+    230          
+    231          
+    232          /**
+    233           * \b archInitSystemTickTimer
+    234           *
+    235           * Initialise the system tick timer. Uses the STM8's TIM1 facility.
+    236           *
+    237           * @return None
+    238           */
+
+   \                                 In section .near_func.text, align 1
+    239          void archInitSystemTickTimer (void)
+    240          {
+    241              CLK_SYSCLKSourceConfig(CLK_SYSCLKSource_HSI);
+   \                     archInitSystemTickTimer:
+   \   000000 A6 01        LD        A, #0x1
+   \   000002 CD ....      CALL      L:CLK_SYSCLKSourceConfig
+    242              CLK_SYSCLKDivConfig(CLK_SYSCLKDiv_1);
+   \   000005 4F           CLR       A
+   \   000006 CD ....      CALL      L:CLK_SYSCLKDivConfig
+    243              CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,ENABLE);
+   \   000009 35 01 ....   MOV       S:?b0, #0x1
+   \   00000D A6 02        LD        A, #0x2
+   \   00000F CD ....      CALL      L:CLK_PeripheralClockConfig
+    244              /* Reset TIM1 */
+    245              TIM4_DeInit();
+   \   000012 CD ....      CALL      L:TIM4_DeInit
+    246          
+    247              /* Configure a 10ms tick */
+    248              TIM4_TimeBaseInit(TIM4_Prescaler_256,250);      //250Hz  4ms
+   \   000015 35 FA ....   MOV       S:?b0, #0xfa
+   \   000019 A6 08        LD        A, #0x8
+   \   00001B CD ....      CALL      L:TIM4_TimeBaseInit
+    249          
+    250              /* Generate an interrupt on timer count overflow */
+    251              TIM4_ITConfig(TIM4_IT_Update,ENABLE);
+   \   00001E 35 01 ....   MOV       S:?b0, #0x1
+   \   000022 A6 01        LD        A, #0x1
+   \   000024 CD ....      CALL      L:TIM4_ITConfig
+    252          
+    253              /* Enable TIM1 */
+    254              TIM4_Cmd(ENABLE);
+   \   000027 A6 01        LD        A, #0x1
+   \   000029 CC ....      JP        L:TIM4_Cmd
+    255          
+    256          }
+    257          
+    258          
+    259          /**
+    260           *
+    261           * System tick ISR.
+    262           *
+    263           * This is responsible for regularly calling the OS system tick handler.
+    264           * The system tick handler checks if any timer callbacks are necessary,
+    265           * and runs the scheduler.
+    266           *
+    267           * The CPU automatically saves all registers before calling out to an
+    268           * interrupt handler like this.
+    269           *
+    270           * The system may decide to schedule in a new thread during the call to
+    271           * atomTimerTick(), in which case the program counter will be redirected
+    272           * to the new thread's running location during atomIntExit(). This ISR
+    273           * function will not actually complete until the thread we interrupted is
+    274           * scheduled back in, at which point the end of this function will be
+    275           * reached (after atomIntExit()) and the IRET call by the compiler will
+    276           * return us to the interrupted thread as if we hadn't run any other
+    277           * thread in the meantime. In other words the interrupted thread can be
+    278           * scheduled out by atomIntExit() and several threads could run before we
+    279           * actually reach the end of this function. When this function does
+    280           * finally complete, the return address (the PC of the thread which was
+    281           * interrupted) will be on the interrupted thread's stack because it was
+    282           * saved on there by the CPU when the interrupt triggered.
+    283           *
+    284           * As with all interrupts, the ISR should call atomIntEnter() and
+    285           * atomIntExit() on entry and exit. This serves two purposes:
+    286           *
+    287           * a) To notify the OS that it is running in interrupt context
+    288           * b) To defer the scheduler until after the ISR is completed
+    289           *
+    290           * We defer all scheduling decisions until after the ISR has completed
+    291           * in case the interrupt handler makes more than one thread ready.
+    292           *
+    293           * @return None
+    294           */
+    295          #if defined(__IAR_SYSTEMS_ICC__)
+    296          #pragma vector = 27     //tim4 vector 25, the vector number has a offset of 2 in stm8l15x_it.c file
+    297          #endif
+
+   \                                 In section .near_func.text, align 1
+    298          INTERRUPT void TIM4_SystemTickISR(void)
+    299          #if defined(__RCSTM8__)
+    300          interrupt 19
+    301          
+    302          #elif defined(__SDCC_stm8)
+    303          __interrupt(19)
+    304          #endif
+    305          {
+   \                     TIM4_SystemTickISR:
+   \                     _interrupt_27:
+   \   000000 8A           PUSH      CC
+   \   000001 84           POP       A
+   \   000002 A4 BF        AND       A, #0xbf
+   \   000004 88           PUSH      A
+   \   000005 86           POP       CC
+   \   000006 CD ....      CALL      L:?push_l0
+   \   000009 CD ....      CALL      L:?push_l1
+    306              /* Call the interrupt entry routine */
+    307              atomIntEnter();
+   \   00000C CD ....      CALL      L:atomIntEnter
+    308          
+    309              /* Call the OS system tick handler */
+    310              atomTimerTick();
+   \   00000F CD ....      CALL      L:atomTimerTick
+    311          
+    312              /* Ack the interrupt (Clear TIM1:SR1 register bit 0) */
+    313              TIM4_ClearITPendingBit(TIM4_IT_Update);
+   \   000012 A6 01        LD        A, #0x1
+   \   000014 CD ....      CALL      L:TIM4_ClearITPendingBit
+    314          
+    315              /* Call the interrupt exit routine */
+    316              atomIntExit(TRUE);
+   \   000017 A6 01        LD        A, #0x1
+   \   000019 CD ....      CALL      L:atomIntExit
+    317          }
+   \   00001C CD ....      CALL      L:?pop_l1
+   \   00001F CD ....      CALL      L:?pop_l0
+   \   000022 80           IRET
+    318          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      35  TIM4_SystemTickISR
+      44  archInitSystemTickTimer
+      41  archThreadContextInit
+      26  thread_shell
+
+ 
+ 146 bytes in section .near_func.text
+ 
+ 146 bytes of CODE memory
+
+Errors: none
+Warnings: 1

@@ -1,0 +1,1137 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:16
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomsem.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomsem.c" -e
+#        -Om --no_unroll --no_inline --no_tbaa --no_cross_call --debug
+#        --code_model small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\atomsem.lst
+#    Object file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\atomsem.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomsem.c
+      1          /*
+      2           * Copyright (c) 2010, Kelvin Lawson. All rights reserved.
+      3           *
+      4           * Redistribution and use in source and binary forms, with or without
+      5           * modification, are permitted provided that the following conditions
+      6           * are met:
+      7           *
+      8           * 1. Redistributions of source code must retain the above copyright
+      9           *    notice, this list of conditions and the following disclaimer.
+     10           * 2. Redistributions in binary form must reproduce the above copyright
+     11           *    notice, this list of conditions and the following disclaimer in the
+     12           *    documentation and/or other materials provided with the distribution.
+     13           * 3. No personal names or organizations' names associated with the
+     14           *    Atomthreads project may be used to endorse or promote products
+     15           *    derived from this software without specific prior written permission.
+     16           *
+     17           * THIS SOFTWARE IS PROVIDED BY THE ATOMTHREADS PROJECT AND CONTRIBUTORS
+     18           * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+     19           * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     20           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE
+     21           * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     22           * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     23           * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     24           * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     25           * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     26           * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     27           * POSSIBILITY OF SUCH DAMAGE.
+     28           */
+     29          
+     30          
+     31          /** 
+     32           * \file
+     33           * Semaphore library.
+     34           *
+     35           *
+     36           * This module implements a counting semaphore library with the following
+     37           * features:
+     38           *
+     39           * \par Flexible blocking APIs
+     40           * Threads which wish to decrement a semaphore can choose whether to block,
+     41           * block with timeout, or not block if the semaphore has reached zero.
+     42           *
+     43           * \par Interrupt-safe calls
+     44           * All APIs can be called from interrupt context. Any calls which could
+     45           * potentially block have optional parameters to prevent blocking if you
+     46           * wish to call them from interrupt context. Any attempt to make a call
+     47           * which would block from interrupt context will be automatically and
+     48           * safely prevented.
+     49           *
+     50           * \par Priority-based queueing
+     51           * Where multiple threads are blocking on a semaphore, they are woken in
+     52           * order of the threads' priorities. Where multiple threads of the same
+     53           * priority are blocking, they are woken in FIFO order.
+     54           *
+     55           * \par Count up to 255
+     56           * Semaphore counts can be initialised and incremented up to a maximum of 255.
+     57           *
+     58           * \par Smart semaphore deletion
+     59           * Where a semaphore is deleted while threads are blocking on it, all blocking
+     60           * threads are woken and returned a status code to indicate the reason for
+     61           * being woken.
+     62           *
+     63           *
+     64           * \n <b> Usage instructions: </b> \n
+     65           *
+     66           * All semaphore objects must be initialised before use by calling
+     67           * atomSemCreate(). Once initialised atomSemGet() and atomSemPut() are used to
+     68           * decrement and increment the semaphore count respectively.
+     69           *
+     70           * If a semaphore count reaches zero, further calls to atomSemGet() will block
+     71           * the calling thread (unless the calling parameters request no blocking). If
+     72           * a call is made to atomSemPut() while threads are blocking on a zero-count
+     73           * semaphore, the highest priority thread is woken. Where multiple threads of
+     74           * the same priority are blocking, they are woken in the order in which the
+     75           * threads started blocking. 
+     76           *
+     77           * A semaphore which is no longer required can be deleted using
+     78           * atomSemDelete(). This function automatically wakes up any threads which are
+     79           * waiting on the deleted semaphore.
+     80           *
+     81           *
+     82           * \n <b> Notes: </b> \n
+     83           *
+     84           * Note that those considering using a semaphore initialised to 1 for mutual
+     85           * exclusion purposes may wish to investigate the mutex library available in
+     86           * Atomthreads.
+     87           *
+     88           */
+     89          
+     90          
+     91          #include "atom.h"
+     92          #include "atomsem.h"
+     93          #include "atomtimer.h"
+     94          
+     95          
+     96          /* Local data types */
+     97          
+     98          typedef struct sem_timer
+     99          {
+    100              ATOM_TCB *tcb_ptr;  /* Thread which is suspended with timeout */
+    101              ATOM_SEM *sem_ptr;  /* Semaphore the thread is suspended on */
+    102          } SEM_TIMER;
+    103          
+    104          
+    105          /* Forward declarations */
+    106          
+    107          static void atomSemTimerCallback (POINTER cb_data);
+    108          
+    109          
+    110          /**
+    111           * \b atomSemCreate
+    112           *
+    113           * Initialises a semaphore object.
+    114           *
+    115           * Must be called before calling any other semaphore library routines on a
+    116           * semaphore. Objects can be deleted later using atomSemDelete().
+    117           *
+    118           * Does not allocate storage, the caller provides the semaphore object.
+    119           *
+    120           * This function can be called from interrupt context.
+    121           *
+    122           * @param[in] sem Pointer to semaphore object
+    123           * @param[in] initial_count Initial count value
+    124           *
+    125           * @retval ATOM_OK Success
+    126           * @retval ATOM_ERR_PARAM Bad parameters
+    127           */
+
+   \                                 In section .near_func.text, align 1
+    128          uint8_t atomSemCreate (ATOM_SEM *sem, uint8_t initial_count)
+    129          {
+    130              uint8_t status;
+    131          
+    132              /* Parameter check */
+    133              if (sem == NULL)
+   \                     atomSemCreate:
+   \   000000 5D           TNZW      X
+   \   000001 26 03        JRNE      L:??atomSemCreate_0
+    134              {
+    135                  /* Bad semaphore pointer */
+    136                  status = ATOM_ERR_PARAM;
+   \   000003 A6 C9        LD        A, #0xc9
+   \   000005 81           RET
+    137              }
+    138              else
+    139              {
+    140                  /* Set the initial count */
+    141                  sem->count = initial_count;
+   \                     ??atomSemCreate_0:
+   \   000006 1C 0002      ADDW      X, #0x2
+   \   000009 F7           LD        (X), A
+   \   00000A 1D 0002      SUBW      X, #0x2
+    142          
+    143                  /* Initialise the suspended threads queue */
+    144                  sem->suspQ = NULL;
+   \   00000D 905F         CLRW      Y
+   \   00000F FF           LDW       (X), Y
+    145          
+    146                  /* Successful */
+    147                  status = ATOM_OK;
+   \   000010 4F           CLR       A
+    148              }
+    149          
+    150              return (status);
+   \   000011 81           RET
+    151          }
+    152          
+    153          
+    154          /**
+    155           * \b atomSemDelete
+    156           *
+    157           * Deletes a semaphore object.
+    158           *
+    159           * Any threads currently suspended on the semaphore will be woken up with
+    160           * return status ATOM_ERR_DELETED. If called at thread context then the
+    161           * scheduler will be called during this function which may schedule in one
+    162           * of the woken threads depending on relative priorities.
+    163           *
+    164           * This function can be called from interrupt context, but loops internally
+    165           * waking up all threads blocking on the semaphore, so the potential
+    166           * execution cycles cannot be determined in advance.
+    167           *
+    168           * @param[in] sem Pointer to semaphore object
+    169           *
+    170           * @retval ATOM_OK Success
+    171           * @retval ATOM_ERR_QUEUE Problem putting a woken thread on the ready queue
+    172           * @retval ATOM_ERR_TIMER Problem cancelling a timeout on a woken thread
+    173           */
+
+   \                                 In section .near_func.text, align 1
+    174          uint8_t atomSemDelete (ATOM_SEM *sem)
+    175          {
+   \                     atomSemDelete:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w7
+   \   000006 3B ....      PUSH      S:?b12
+   \   000009 BF ..        LDW       S:?w7, X
+    176              uint8_t status;
+    177              CRITICAL_STORE;
+    178              ATOM_TCB *tcb_ptr;
+    179              uint8_t woken_threads = FALSE;
+   \   00000B 3F ..        CLR       S:?b11
+    180          
+    181              /* Parameter check */
+    182              if (sem == NULL)
+   \   00000D 5D           TNZW      X
+   \   00000E 26 07        JRNE      L:??atomSemDelete_0
+    183              {
+    184                  /* Bad semaphore pointer */
+    185                  status = ATOM_ERR_PARAM;
+   \   000010 35 C9 ....   MOV       S:?b10, #0xc9
+   \   000014 CC ....      JP        L:??atomSemDelete_1
+    186              }
+    187              else
+    188              {
+    189                  /* Default to success status unless errors occur during wakeup */
+    190                  status = ATOM_OK;
+   \                     ??atomSemDelete_0:
+   \   000017 3F ..        CLR       S:?b10
+   \   000019 20 16        JRA       L:??atomSemDelete_2
+    191          
+    192                  /* Wake up all suspended tasks */
+    193                  while (1)
+    194                  {
+    195                      /* Enter critical region */
+    196                      CRITICAL_START ();
+    197          
+    198                      /* Check if any threads are suspended */
+    199                      tcb_ptr = tcbDequeueHead (&sem->suspQ);
+    200          
+    201                      /* A thread is suspended on the semaphore */
+    202                      if (tcb_ptr)
+    203                      {
+    204                          /* Return error status to the waiting thread */
+    205                          tcb_ptr->suspend_wake_status = ATOM_ERR_DELETED;
+    206          
+    207                          /* Put the thread on the ready queue */
+    208                          if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) != ATOM_OK)
+    209                          {
+    210                              /* Exit critical region */
+    211                              CRITICAL_END ();
+    212          
+    213                              /* Quit the loop, returning error */
+    214                              status = ATOM_ERR_QUEUE;
+    215                              break;
+    216                          }
+    217          
+    218                          /* If there's a timeout on this suspension, cancel it */
+    219                          if (tcb_ptr->suspend_timo_cb)
+    220                          {
+    221                              /* Cancel the callback */
+    222                              if (atomTimerCancel (tcb_ptr->suspend_timo_cb) != ATOM_OK)
+    223                              {
+    224                                  /* Exit critical region */
+    225                                  CRITICAL_END ();
+    226          
+    227                                  /* Quit the loop, returning error */
+    228                                  status = ATOM_ERR_TIMER;
+    229                                  break;
+    230                              }
+    231          
+    232                              /* Flag as no timeout registered */
+    233                              tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomSemDelete_3:
+   \   00001B 5F           CLRW      X
+   \   00001C 90BE ..      LDW       Y, S:?w4
+   \   00001F 90FF         LDW       (Y), X
+    234          
+    235                          }
+    236          
+    237                          /* Exit critical region */
+    238                          CRITICAL_END ();
+   \                     ??atomSemDelete_4:
+   \   000021 B6 ..        LD        A, S:?b12
+   \   000023 B7 ..        LD        S:?b0, A
+   \   000025 8A           PUSH      CC
+   \   000026 84           POP       A
+   \   000027 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000029 BA ..        OR        A, S:?b0
+   \   00002B 88           PUSH      A
+   \   00002C 86           POP       CC
+    239          
+    240                          /* Request a reschedule */
+    241                          woken_threads = TRUE;
+   \   00002D 35 01 ....   MOV       S:?b11, #0x1
+   \                     ??atomSemDelete_2:
+   \   000031 8A           PUSH      CC
+   \   000032 84           POP       A
+   \   000033 A4 28        AND       A, #0x28
+   \   000035 B7 ..        LD        S:?b12, A
+   \   000037 9B           SIM
+   \   000038 BE ..        LDW       X, S:?w7
+   \   00003A CD ....      CALL      L:tcbDequeueHead
+   \   00003D BF ..        LDW       S:?w4, X
+   \   00003F 27 4A        JREQ      L:??atomSemDelete_5
+   \   000041 A6 CA        LD        A, #0xca
+   \   000043 1C 000E      ADDW      X, #0xe
+   \   000046 F7           LD        (X), A
+   \   000047 90BE ..      LDW       Y, S:?w4
+   \   00004A AE ....      LDW       X, #tcbReadyQ
+   \   00004D CD ....      CALL      L:tcbEnqueuePriority
+   \   000050 A1 00        CP        A, #0x0
+   \   000052 27 12        JREQ      L:??atomSemDelete_6
+   \   000054 B6 ..        LD        A, S:?b12
+   \   000056 B7 ..        LD        S:?b0, A
+   \   000058 8A           PUSH      CC
+   \   000059 84           POP       A
+   \   00005A A4 D7        AND       A, #0xffffffffffffffd7
+   \   00005C BA ..        OR        A, S:?b0
+   \   00005E 88           PUSH      A
+   \   00005F 86           POP       CC
+   \   000060 35 CC ....   MOV       S:?b10, #0xcc
+   \   000064 20 31        JRA       L:??atomSemDelete_7
+   \                     ??atomSemDelete_6:
+   \   000066 BE ..        LDW       X, S:?w4
+   \   000068 1C 000F      ADDW      X, #0xf
+   \   00006B BF ..        LDW       S:?w4, X
+   \   00006D 92CE ..      LDW       X, [S:?w4.w]
+   \   000070 27 AF        JREQ      L:??atomSemDelete_4
+   \   000072 CD ....      CALL      L:atomTimerCancel
+   \   000075 A1 00        CP        A, #0x0
+   \   000077 27 A2        JREQ      L:??atomSemDelete_3
+   \   000079 B6 ..        LD        A, S:?b12
+   \   00007B B7 ..        LD        S:?b0, A
+   \   00007D 8A           PUSH      CC
+   \   00007E 84           POP       A
+   \   00007F A4 D7        AND       A, #0xffffffffffffffd7
+   \   000081 BA ..        OR        A, S:?b0
+   \   000083 88           PUSH      A
+   \   000084 86           POP       CC
+   \   000085 35 CD ....   MOV       S:?b10, #0xcd
+   \   000089 20 0C        JRA       L:??atomSemDelete_7
+    242                      }
+    243          
+    244                      /* No more suspended threads */
+    245                      else
+    246                      {
+    247                          /* Exit critical region and quit the loop */
+    248                          CRITICAL_END ();
+   \                     ??atomSemDelete_5:
+   \   00008B B6 ..        LD        A, S:?b12
+   \   00008D B7 ..        LD        S:?b0, A
+   \   00008F 8A           PUSH      CC
+   \   000090 84           POP       A
+   \   000091 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000093 BA ..        OR        A, S:?b0
+   \   000095 88           PUSH      A
+   \   000096 86           POP       CC
+    249                          break;
+    250                      }
+    251                  }
+    252          
+    253                  /* Call scheduler if any threads were woken up */
+    254                  if (woken_threads == TRUE)
+   \                     ??atomSemDelete_7:
+   \   000097 B6 ..        LD        A, S:?b11
+   \   000099 4A           DEC       A
+   \   00009A 26 0A        JRNE      L:??atomSemDelete_1
+    255                  {
+    256                      /**
+    257                       * Only call the scheduler if we are in thread context, otherwise
+    258                       * it will be called on exiting the ISR by atomIntExit().
+    259                       */
+    260                      if (atomCurrentContext())
+   \   00009C CD ....      CALL      L:atomCurrentContext
+   \   00009F 5D           TNZW      X
+   \   0000A0 27 04        JREQ      L:??atomSemDelete_1
+    261                          atomSched (FALSE);
+   \   0000A2 4F           CLR       A
+   \   0000A3 CD ....      CALL      L:atomSched
+    262                  }
+    263              }
+    264          
+    265              return (status);
+   \                     ??atomSemDelete_1:
+   \   0000A6 B6 ..        LD        A, S:?b10
+   \   0000A8 32 ....      POP       S:?b12
+   \   0000AB CD ....      CALL      L:?pop_w7
+   \   0000AE CC ....      JP        L:?epilogue_l2
+    266          }
+    267          
+    268          
+    269          /**
+    270           * \b atomSemGet
+    271           *
+    272           * Perform a get operation on a semaphore.
+    273           *
+    274           * This decrements the current count value for the semaphore and returns.
+    275           * If the count value is already zero then the call will block until the
+    276           * count is incremented by another thread, or until the specified \c timeout
+    277           * is reached. Blocking threads will also be woken if the semaphore is
+    278           * deleted by another thread while blocking.
+    279           *
+    280           * Depending on the \c timeout value specified the call will do one of
+    281           * the following if the count value is zero:
+    282           *
+    283           * \c timeout == 0 : Call will block until the count is non-zero \n
+    284           * \c timeout > 0 : Call will block until non-zero up to the specified timeout \n
+    285           * \c timeout == -1 : Return immediately if the count is zero \n
+    286           *
+    287           * If the call needs to block and \c timeout is zero, it will block
+    288           * indefinitely until atomSemPut() or atomSemDelete() is called on the
+    289           * semaphore.
+    290           *
+    291           * If the call needs to block and \c timeout is non-zero, the call will only
+    292           * block for the specified number of system ticks after which time, if the
+    293           * thread was not already woken, the call will return with \c ATOM_TIMEOUT.
+    294           *
+    295           * If the call would normally block and \c timeout is -1, the call will
+    296           * return immediately with \c ATOM_WOULDBLOCK.
+    297           *
+    298           * This function can only be called from interrupt context if the \c timeout
+    299           * parameter is -1 (in which case it does not block).
+    300           *
+    301           * @param[in] sem Pointer to semaphore object
+    302           * @param[in] timeout Max system ticks to block (0 = forever)
+    303           *
+    304           * @retval ATOM_OK Success
+    305           * @retval ATOM_TIMEOUT Semaphore timed out before being woken
+    306           * @retval ATOM_WOULDBLOCK Called with timeout == -1 but count is zero
+    307           * @retval ATOM_ERR_DELETED Semaphore was deleted while suspended
+    308           * @retval ATOM_ERR_CONTEXT Not called in thread context and attempted to block
+    309           * @retval ATOM_ERR_PARAM Bad parameter
+    310           * @retval ATOM_ERR_QUEUE Problem putting the thread on the suspend queue
+    311           * @retval ATOM_ERR_TIMER Problem registering the timeout
+    312           */
+
+   \                                 In section .near_func.text, align 1
+    313          uint8_t atomSemGet (ATOM_SEM *sem, int32_t timeout)
+    314          {
+   \                     atomSemGet:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 89           PUSHW     X
+   \   000007 52 0E        SUB       SP, #0xe
+   \   000009 CD ....      CALL      L:?mov_l2_l0
+    315              CRITICAL_STORE;
+    316              uint8_t status;
+    317              SEM_TIMER timer_data;
+    318              ATOM_TIMER timer_cb;
+    319              ATOM_TCB *curr_tcb_ptr;
+    320          
+    321              /* Check parameters */
+    322              if (sem == NULL)
+   \   00000C 1E 0F        LDW       X, (0xf,SP)
+   \   00000E 26 07        JRNE      L:??atomSemGet_0
+    323              {
+    324                  /* Bad semaphore pointer */
+    325                  status = ATOM_ERR_PARAM;
+   \   000010 35 C9 ....   MOV       S:?b15, #0xc9
+   \   000014 CC ....      JP        L:??atomSemGet_1
+    326              }
+    327              else
+    328              {
+    329                  /* Protect access to the semaphore object and OS queues */
+    330                  CRITICAL_START ();
+   \                     ??atomSemGet_0:
+   \   000017 8A           PUSH      CC
+   \   000018 84           POP       A
+   \   000019 A4 28        AND       A, #0x28
+   \   00001B B7 ..        LD        S:?b14, A
+   \   00001D 9B           SIM
+    331          
+    332                  /* If count is zero, block the calling thread */
+    333                  if (sem->count == 0)
+   \   00001E 1E 0F        LDW       X, (0xf,SP)
+   \   000020 5C           INCW      X
+   \   000021 5C           INCW      X
+   \   000022 F6           LD        A, (X)
+   \   000023 27 03        JREQ      ??lb_0
+   \   000025 CC ....      JP        L:??atomSemGet_2
+    334                  {
+    335                      /* If called with timeout >= 0, we should block */
+    336                      if (timeout >= 0)
+   \                     ??lb_0:
+   \   000028 3D ..        TNZ       S:?b8
+   \   00002A 2A 03        JRPL      ??lb_1
+   \   00002C CC ....      JP        L:??atomSemGet_3
+    337                      {
+    338                          /* Count is zero, block the calling thread */
+    339          
+    340                          /* Get the current TCB */
+    341                          curr_tcb_ptr = atomCurrentContext();
+   \                     ??lb_1:
+   \   00002F CD ....      CALL      L:atomCurrentContext
+   \   000032 BF ..        LDW       S:?w6, X
+    342          
+    343                          /* Check we are actually in thread context */
+    344                          if (curr_tcb_ptr)
+   \   000034 26 03        JRNE      ??lb_2
+   \   000036 CC ....      JP        L:??atomSemGet_4
+    345                          {
+    346                              /* Add current thread to the suspend list on this semaphore */
+    347                              if (tcbEnqueuePriority (&sem->suspQ, curr_tcb_ptr) != ATOM_OK)
+   \                     ??lb_2:
+   \   000039 90BE ..      LDW       Y, S:?w6
+   \   00003C 1E 0F        LDW       X, (0xf,SP)
+   \   00003E CD ....      CALL      L:tcbEnqueuePriority
+   \   000041 A1 00        CP        A, #0x0
+   \   000043 27 13        JREQ      L:??atomSemGet_5
+    348                              {
+    349                                  /* Exit critical region */
+    350                                  CRITICAL_END ();
+   \   000045 B6 ..        LD        A, S:?b14
+   \   000047 B7 ..        LD        S:?b0, A
+   \   000049 8A           PUSH      CC
+   \   00004A 84           POP       A
+   \   00004B A4 D7        AND       A, #0xffffffffffffffd7
+   \   00004D BA ..        OR        A, S:?b0
+   \   00004F 88           PUSH      A
+   \   000050 86           POP       CC
+    351          
+    352                                  /* There was an error putting this thread on the suspend list */
+    353                                  status = ATOM_ERR_QUEUE;
+   \   000051 35 CC ....   MOV       S:?b15, #0xcc
+   \   000055 CC ....      JP        L:??atomSemGet_1
+    354                              }
+   \                     ??atomSemGet_5:
+   \   000058 A6 01        LD        A, #0x1
+   \   00005A BE ..        LDW       X, S:?w6
+   \   00005C 1C 000D      ADDW      X, #0xd
+   \   00005F F7           LD        (X), A
+    355                              else
+    356                              {
+    357                                  /* Set suspended status for the current thread */
+    358                                  curr_tcb_ptr->suspended = TRUE;
+    359          
+    360                                  /* Track errors */
+    361                                  status = ATOM_OK;
+   \   000060 3F ..        CLR       S:?b15
+   \   000062 BE ..        LDW       X, S:?w4
+   \   000064 26 02        JRNE      L:??atomSemGet_6
+   \   000066 BE ..        LDW       X, S:?w5
+   \                     ??atomSemGet_6:
+   \   000068 27 4C        JREQ      L:??atomSemGet_7
+    362          
+    363                                  /* Register a timer callback if requested */
+    364                                  if (timeout)
+    365                                  {
+    366                                      /* Fill out the data needed by the callback to wake us up */
+    367                                      timer_data.tcb_ptr = curr_tcb_ptr;
+   \   00006A BE ..        LDW       X, S:?w6
+   \   00006C 1F 01        LDW       (0x1,SP), X
+    368                                      timer_data.sem_ptr = sem;
+   \   00006E 1E 0F        LDW       X, (0xf,SP)
+   \   000070 1F 03        LDW       (0x3,SP), X
+    369          
+    370                                      /* Fill out the timer callback request structure */
+    371                                      timer_cb.cb_func = atomSemTimerCallback;
+   \   000072 AE ....      LDW       X, #atomSemTimerCallback
+   \   000075 1F 05        LDW       (0x5,SP), X
+    372                                      timer_cb.cb_data = (POINTER)&timer_data;
+   \   000077 96           LDW       X, SP
+   \   000078 5C           INCW      X
+   \   000079 1F 07        LDW       (0x7,SP), X
+    373                                      timer_cb.cb_ticks = timeout;
+   \   00007B CD ....      CALL      L:?load32_dbsp_l2
+   \   00007E 09           DC8       0x9
+    374          
+    375                                      /**
+    376                                       * Store the timer details in the TCB so that we can
+    377                                       * cancel the timer callback if the semaphore is put
+    378                                       * before the timeout occurs.
+    379                                       */
+    380                                      curr_tcb_ptr->suspend_timo_cb = &timer_cb;
+   \   00007F 96           LDW       X, SP
+   \   000080 1C 0005      ADDW      X, #0x5
+   \   000083 90BE ..      LDW       Y, S:?w6
+   \   000086 72A9 000F    ADDW      Y, #0xf
+   \   00008A 90FF         LDW       (Y), X
+    381          
+    382                                      /* Register a callback on timeout */
+    383                                      if (atomTimerRegister (&timer_cb) != ATOM_OK)
+   \   00008C 96           LDW       X, SP
+   \   00008D 1C 0005      ADDW      X, #0x5
+   \   000090 CD ....      CALL      L:atomTimerRegister
+   \   000093 A1 00        CP        A, #0x0
+   \   000095 27 29        JREQ      L:??atomSemGet_8
+    384                                      {
+    385                                          /* Timer registration failed */
+    386                                          status = ATOM_ERR_TIMER;
+   \   000097 35 CD ....   MOV       S:?b15, #0xcd
+    387          
+    388                                          /* Clean up and return to the caller */
+    389                                          (void)tcbDequeueEntry (&sem->suspQ, curr_tcb_ptr);
+   \   00009B 90BE ..      LDW       Y, S:?w6
+   \   00009E 1E 0F        LDW       X, (0xf,SP)
+   \   0000A0 CD ....      CALL      L:tcbDequeueEntry
+    390                                          curr_tcb_ptr->suspended = FALSE;
+   \   0000A3 4F           CLR       A
+   \   0000A4 BE ..        LDW       X, S:?w6
+   \   0000A6 1C 000D      ADDW      X, #0xd
+   \   0000A9 F7           LD        (X), A
+    391                                          curr_tcb_ptr->suspend_timo_cb = NULL;
+   \   0000AA 5F           CLRW      X
+   \   0000AB 90BE ..      LDW       Y, S:?w6
+   \   0000AE 72A9 000F    ADDW      Y, #0xf
+   \   0000B2 90FF         LDW       (Y), X
+   \   0000B4 20 0A        JRA       L:??atomSemGet_8
+    392                                      }
+    393                                  }
+    394          
+    395                                  /* Set no timeout requested */
+    396                                  else
+    397                                  {
+    398                                      /* No need to cancel timeouts on this one */
+    399                                      curr_tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomSemGet_7:
+   \   0000B6 5F           CLRW      X
+   \   0000B7 90BE ..      LDW       Y, S:?w6
+   \   0000BA 72A9 000F    ADDW      Y, #0xf
+   \   0000BE 90FF         LDW       (Y), X
+    400                                  }
+    401          
+    402                                  /* Exit critical region */
+    403                                  CRITICAL_END ();
+   \                     ??atomSemGet_8:
+   \   0000C0 B6 ..        LD        A, S:?b14
+   \   0000C2 B7 ..        LD        S:?b0, A
+   \   0000C4 8A           PUSH      CC
+   \   0000C5 84           POP       A
+   \   0000C6 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000C8 BA ..        OR        A, S:?b0
+   \   0000CA 88           PUSH      A
+   \   0000CB 86           POP       CC
+    404          
+    405                                  /* Check no errors have occurred */
+    406                                  if (status == ATOM_OK)
+   \   0000CC 3D ..        TNZ       S:?b15
+   \   0000CE 26 43        JRNE      L:??atomSemGet_1
+    407                                  {
+    408                                      /**
+    409                                       * Current thread now blocking, schedule in a new
+    410                                       * one. We already know we are in thread context
+    411                                       * so can call the scheduler from here.
+    412                                       */
+    413                                      atomSched (FALSE);
+   \   0000D0 4F           CLR       A
+   \   0000D1 CD ....      CALL      L:atomSched
+    414          
+    415                                      /**
+    416                                       * Normal atomSemPut() wakeups will set ATOM_OK status,
+    417                                       * while timeouts will set ATOM_TIMEOUT and semaphore
+    418                                       * deletions will set ATOM_ERR_DELETED.
+    419                                       */
+    420                                      status = curr_tcb_ptr->suspend_wake_status;
+   \   0000D4 BE ..        LDW       X, S:?w6
+   \   0000D6 1C 000E      ADDW      X, #0xe
+   \   0000D9 F6           LD        A, (X)
+   \   0000DA B7 ..        LD        S:?b15, A
+   \   0000DC 20 35        JRA       L:??atomSemGet_1
+    421          
+    422                                      /**
+    423                                       * If we have been woken up with ATOM_OK then
+    424                                       * another thread incremented the semaphore and
+    425                                       * handed control to this thread. In theory the
+    426                                       * the posting thread increments the counter and
+    427                                       * as soon as this thread wakes up we decrement
+    428                                       * the counter here, but to prevent another
+    429                                       * thread preempting this thread and decrementing
+    430                                       * the semaphore before this section was
+    431                                       * scheduled back in, we emulate the increment
+    432                                       * and decrement by not incrementing in the
+    433                                       * atomSemPut() and not decrementing here. The
+    434                                       * count remains zero throughout preventing other
+    435                                       * threads preempting before we decrement the
+    436                                       * count again.
+    437                                       */
+    438          
+    439                                  }
+    440                              }
+    441                          }
+    442                          else
+    443                          {
+    444                              /* Exit critical region */
+    445                              CRITICAL_END ();
+   \                     ??atomSemGet_4:
+   \   0000DE B6 ..        LD        A, S:?b14
+   \   0000E0 B7 ..        LD        S:?b0, A
+   \   0000E2 8A           PUSH      CC
+   \   0000E3 84           POP       A
+   \   0000E4 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000E6 BA ..        OR        A, S:?b0
+   \   0000E8 88           PUSH      A
+   \   0000E9 86           POP       CC
+    446          
+    447                              /* Not currently in thread context, can't suspend */
+    448                              status = ATOM_ERR_CONTEXT;
+   \   0000EA 35 C8 ....   MOV       S:?b15, #0xc8
+   \   0000EE 20 23        JRA       L:??atomSemGet_1
+    449                          }
+    450                      }
+    451                      else
+    452                      {
+    453                          /* timeout == -1, requested not to block and count is zero */
+    454                          CRITICAL_END();
+   \                     ??atomSemGet_3:
+   \   0000F0 B6 ..        LD        A, S:?b14
+   \   0000F2 B7 ..        LD        S:?b0, A
+   \   0000F4 8A           PUSH      CC
+   \   0000F5 84           POP       A
+   \   0000F6 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000F8 BA ..        OR        A, S:?b0
+   \   0000FA 88           PUSH      A
+   \   0000FB 86           POP       CC
+    455                          status = ATOM_WOULDBLOCK;
+   \   0000FC 35 03 ....   MOV       S:?b15, #0x3
+   \   000100 20 11        JRA       L:??atomSemGet_1
+    456                      }
+    457                  }
+    458                  else
+    459                  {
+    460                      /* Count is non-zero, just decrement it and return to calling thread */
+    461                      sem->count--;
+   \                     ??atomSemGet_2:
+   \   000102 AB FF        ADD       A, #0xff
+   \   000104 F7           LD        (X), A
+    462          
+    463                      /* Exit critical region */
+    464                      CRITICAL_END ();
+   \   000105 B6 ..        LD        A, S:?b14
+   \   000107 B7 ..        LD        S:?b0, A
+   \   000109 8A           PUSH      CC
+   \   00010A 84           POP       A
+   \   00010B A4 D7        AND       A, #0xffffffffffffffd7
+   \   00010D BA ..        OR        A, S:?b0
+   \   00010F 88           PUSH      A
+   \   000110 86           POP       CC
+    465          
+    466                      /* Successful */
+    467                      status = ATOM_OK;
+   \   000111 3F ..        CLR       S:?b15
+    468                  }
+    469              }
+    470          
+    471              return (status);
+   \                     ??atomSemGet_1:
+   \   000113 B6 ..        LD        A, S:?b15
+   \   000115 5B 10        ADD       SP, #0x10
+   \   000117 CC ....      JP        L:?epilogue_l2_l3
+    472          }
+    473          
+    474          
+    475          /**
+    476           * \b atomSemPut
+    477           *
+    478           * Perform a put operation on a semaphore.
+    479           *
+    480           * This increments the current count value for the semaphore and returns.
+    481           *
+    482           * If the count value was previously zero and there are threads blocking on the
+    483           * semaphore, the call will wake up the highest priority thread suspended. Only
+    484           * one thread is woken per call to atomSemPut(). If multiple threads of the
+    485           * same priority are suspended, they are woken in order of suspension (FIFO).
+    486           *
+    487           * This function can be called from interrupt context.
+    488           *
+    489           * @param[in] sem Pointer to semaphore object
+    490           *
+    491           * @retval ATOM_OK Success
+    492           * @retval ATOM_ERR_OVF The semaphore count would have overflowed (>255)
+    493           * @retval ATOM_ERR_PARAM Bad parameter
+    494           * @retval ATOM_ERR_QUEUE Problem putting a woken thread on the ready queue
+    495           * @retval ATOM_ERR_TIMER Problem cancelling a timeout for a woken thread
+    496           */
+
+   \                                 In section .near_func.text, align 1
+    497          uint8_t atomSemPut (ATOM_SEM * sem)
+    498          {
+   \                     atomSemPut:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 3B ....      PUSH      S:?b10
+    499              uint8_t status;
+    500              CRITICAL_STORE;
+    501              ATOM_TCB *tcb_ptr;
+    502          
+    503              /* Check parameters */
+    504              if (sem == NULL)
+   \   000006 5D           TNZW      X
+   \   000007 26 07        JRNE      L:??atomSemPut_0
+    505              {
+    506                  /* Bad semaphore pointer */
+    507                  status = ATOM_ERR_PARAM;
+   \   000009 35 C9 ....   MOV       S:?b8, #0xc9
+   \   00000D CC ....      JP        L:??atomSemPut_1
+    508              }
+    509              else
+    510              {
+    511                  /* Protect access to the semaphore object and OS queues */
+    512                  CRITICAL_START ();
+   \                     ??atomSemPut_0:
+   \   000010 8A           PUSH      CC
+   \   000011 84           POP       A
+   \   000012 A4 28        AND       A, #0x28
+   \   000014 B7 ..        LD        S:?b10, A
+   \   000016 9B           SIM
+    513          
+    514                  /* If any threads are blocking on the semaphore, wake up one */
+    515                  if (sem->suspQ)
+   \   000017 9093         LDW       Y, X
+   \   000019 90FE         LDW       Y, (Y)
+   \   00001B 27 62        JREQ      L:??atomSemPut_2
+    516                  {
+    517                      /**
+    518                       * Threads are woken up in priority order, with a FIFO system
+    519                       * used on same priority threads. We always take the head,
+    520                       * ordering is taken care of by an ordered list enqueue.
+    521                       */
+    522                      tcb_ptr = tcbDequeueHead (&sem->suspQ);
+   \   00001D CD ....      CALL      L:tcbDequeueHead
+   \   000020 BF ..        LDW       S:?w4, X
+    523                      if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) != ATOM_OK)
+   \   000022 90BE ..      LDW       Y, S:?w4
+   \   000025 AE ....      LDW       X, #tcbReadyQ
+   \   000028 CD ....      CALL      L:tcbEnqueuePriority
+   \   00002B A1 00        CP        A, #0x0
+   \   00002D 27 12        JREQ      L:??atomSemPut_3
+    524                      {
+    525                          /* Exit critical region */
+    526                          CRITICAL_END ();
+   \   00002F B6 ..        LD        A, S:?b10
+   \   000031 B7 ..        LD        S:?b0, A
+   \   000033 8A           PUSH      CC
+   \   000034 84           POP       A
+   \   000035 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000037 BA ..        OR        A, S:?b0
+   \   000039 88           PUSH      A
+   \   00003A 86           POP       CC
+    527          
+    528                          /* There was a problem putting the thread on the ready queue */
+    529                          status = ATOM_ERR_QUEUE;
+   \   00003B 35 CC ....   MOV       S:?b8, #0xcc
+   \   00003F 20 5D        JRA       L:??atomSemPut_1
+    530                      }
+    531                      else
+    532                      {
+    533                          /* Set OK status to be returned to the waiting thread */
+    534                          tcb_ptr->suspend_wake_status = ATOM_OK;
+   \                     ??atomSemPut_3:
+   \   000041 4F           CLR       A
+   \   000042 BE ..        LDW       X, S:?w4
+   \   000044 1C 000E      ADDW      X, #0xe
+   \   000047 F7           LD        (X), A
+    535          
+    536                          /* If there's a timeout on this suspension, cancel it */
+    537                          if ((tcb_ptr->suspend_timo_cb != NULL)
+    538                              && (atomTimerCancel (tcb_ptr->suspend_timo_cb) != ATOM_OK))
+   \   000048 BE ..        LDW       X, S:?w4
+   \   00004A 1C 000F      ADDW      X, #0xf
+   \   00004D BF ..        LDW       S:?w4, X
+   \   00004F 92CE ..      LDW       X, [S:?w4.w]
+   \   000052 27 0D        JREQ      L:??atomSemPut_4
+   \   000054 CD ....      CALL      L:atomTimerCancel
+   \   000057 A1 00        CP        A, #0x0
+   \   000059 27 06        JREQ      L:??atomSemPut_4
+    539                          {
+    540                              /* There was a problem cancelling a timeout on this semaphore */
+    541                              status = ATOM_ERR_TIMER;
+   \   00005B 35 CD ....   MOV       S:?b8, #0xcd
+   \   00005F 20 06        JRA       L:??atomSemPut_5
+    542                          }
+    543                          else
+    544                          {
+    545                              /* Flag as no timeout registered */
+    546                              tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomSemPut_4:
+   \   000061 5F           CLRW      X
+   \   000062 92CF ..      LDW       [S:?w4.w], X
+    547          
+    548                              /* Successful */
+    549                              status = ATOM_OK;
+   \   000065 3F ..        CLR       S:?b8
+    550                          }
+    551          
+    552                          /* Exit critical region */
+    553                          CRITICAL_END ();
+   \                     ??atomSemPut_5:
+   \   000067 B6 ..        LD        A, S:?b10
+   \   000069 B7 ..        LD        S:?b0, A
+   \   00006B 8A           PUSH      CC
+   \   00006C 84           POP       A
+   \   00006D A4 D7        AND       A, #0xffffffffffffffd7
+   \   00006F BA ..        OR        A, S:?b0
+   \   000071 88           PUSH      A
+   \   000072 86           POP       CC
+    554          
+    555                          /**
+    556                           * The scheduler may now make a policy decision to thread
+    557                           * switch if we are currently in thread context. If we are
+    558                           * in interrupt context it will be handled by atomIntExit().
+    559                           */
+    560                          if (atomCurrentContext())
+   \   000073 CD ....      CALL      L:atomCurrentContext
+   \   000076 5D           TNZW      X
+   \   000077 27 25        JREQ      L:??atomSemPut_1
+    561                              atomSched (FALSE);
+   \   000079 4F           CLR       A
+   \   00007A CD ....      CALL      L:atomSched
+   \   00007D 20 1F        JRA       L:??atomSemPut_1
+    562                      }
+    563                  }
+    564          
+    565                  /* If no threads waiting, just increment the count and return */
+    566                  else
+    567                  {
+    568                      /* Check for count overflow */
+    569                      if (sem->count == 255)
+   \                     ??atomSemPut_2:
+   \   00007F 1C 0002      ADDW      X, #0x2
+   \   000082 F6           LD        A, (X)
+   \   000083 A1 FF        CP        A, #0xff
+   \   000085 26 06        JRNE      L:??atomSemPut_6
+    570                      {
+    571                          /* Don't increment, just return error status */
+    572                          status = ATOM_ERR_OVF;
+   \   000087 35 CB ....   MOV       S:?b8, #0xcb
+   \   00008B 20 05        JRA       L:??atomSemPut_7
+    573                      }
+    574                      else
+    575                      {
+    576                          /* Increment the count and return success */
+    577                          sem->count++;
+   \                     ??atomSemPut_6:
+   \   00008D AB 01        ADD       A, #0x1
+   \   00008F F7           LD        (X), A
+    578                          status = ATOM_OK;
+   \   000090 3F ..        CLR       S:?b8
+    579                      }
+    580          
+    581                      /* Exit critical region */
+    582                      CRITICAL_END ();
+   \                     ??atomSemPut_7:
+   \   000092 B6 ..        LD        A, S:?b10
+   \   000094 B7 ..        LD        S:?b0, A
+   \   000096 8A           PUSH      CC
+   \   000097 84           POP       A
+   \   000098 A4 D7        AND       A, #0xffffffffffffffd7
+   \   00009A BA ..        OR        A, S:?b0
+   \   00009C 88           PUSH      A
+   \   00009D 86           POP       CC
+    583                  }
+    584              }
+    585          
+    586              return (status);
+   \                     ??atomSemPut_1:
+   \   00009E B6 ..        LD        A, S:?b8
+   \   0000A0 32 ....      POP       S:?b10
+   \   0000A3 CC ....      JP        L:?epilogue_w4
+    587          }
+    588          
+    589          
+    590          /**
+    591           * \b atomSemResetCount
+    592           *
+    593           * Set a new count value on a semaphore.
+    594           *
+    595           * Care must be taken when using this function, as there may be threads
+    596           * suspended on the semaphore. In general it should only be used once a
+    597           * semaphore is out of use.
+    598           *
+    599           * This function can be called from interrupt context.
+    600           *
+    601           * @param[in] sem Pointer to semaphore object
+    602           * @param[in] count New count value
+    603           *
+    604           * @retval ATOM_OK Success
+    605           * @retval ATOM_ERR_PARAM Bad parameter
+    606           */
+
+   \                                 In section .near_func.text, align 1
+    607          uint8_t atomSemResetCount (ATOM_SEM *sem, uint8_t count)
+    608          {
+    609              uint8_t status;
+    610          
+    611              /* Parameter check */
+    612              if (sem == NULL)
+   \                     atomSemResetCount:
+   \   000000 5D           TNZW      X
+   \   000001 26 03        JRNE      L:??atomSemResetCount_0
+    613              {
+    614                  /* Bad semaphore pointer */
+    615                  status = ATOM_ERR_PARAM;
+   \   000003 A6 C9        LD        A, #0xc9
+   \   000005 81           RET
+    616              }
+    617              else
+    618              {
+    619                  /* Set the count */
+    620                  sem->count = count;
+   \                     ??atomSemResetCount_0:
+   \   000006 1C 0002      ADDW      X, #0x2
+   \   000009 F7           LD        (X), A
+    621          
+    622                  /* Successful */
+    623                  status = ATOM_OK;
+   \   00000A 4F           CLR       A
+    624              }
+    625          
+    626              return (status);
+   \   00000B 81           RET
+    627          
+    628          }
+    629          
+    630          
+    631          /**
+    632           * \b atomSemTimerCallback
+    633           *
+    634           * This is an internal function not for use by application code.
+    635           *
+    636           * Timeouts on suspended threads are notified by the timer system through
+    637           * this generic callback. The timer system calls us back with a pointer to
+    638           * the relevant \c SEM_TIMER object which is used to retrieve the
+    639           * semaphore details.
+    640           *
+    641           * @param[in] cb_data Pointer to a SEM_TIMER object
+    642           */
+
+   \                                 In section .near_func.text, align 1
+    643          static void atomSemTimerCallback (POINTER cb_data)
+    644          {
+   \                     atomSemTimerCallback:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 3B ....      PUSH      S:?b10
+   \   000006 BF ..        LDW       S:?w4, X
+    645              SEM_TIMER *timer_data_ptr;
+    646              CRITICAL_STORE;
+    647          
+    648              /* Get the SEM_TIMER structure pointer */
+    649              timer_data_ptr = (SEM_TIMER *)cb_data;
+    650          
+    651              /* Check parameter is valid */
+    652              if (timer_data_ptr)
+   \   000008 27 3D        JREQ      L:??atomSemTimerCallback_0
+    653              {
+    654                  /* Enter critical region */
+    655                  CRITICAL_START ();
+   \   00000A 8A           PUSH      CC
+   \   00000B 84           POP       A
+   \   00000C A4 28        AND       A, #0x28
+   \   00000E B7 ..        LD        S:?b10, A
+   \   000010 9B           SIM
+    656          
+    657                  /* Set status to indicate to the waiting thread that it timed out */
+    658                  timer_data_ptr->tcb_ptr->suspend_wake_status = ATOM_TIMEOUT;
+   \   000011 92CE ..      LDW       X, [S:?w4.w]
+   \   000014 1C 000E      ADDW      X, #0xe
+   \   000017 A6 02        LD        A, #0x2
+   \   000019 F7           LD        (X), A
+    659          
+    660                  /* Flag as no timeout registered */
+    661                  timer_data_ptr->tcb_ptr->suspend_timo_cb = NULL;
+   \   00001A 92CE ..      LDW       X, [S:?w4.w]
+   \   00001D 9093         LDW       Y, X
+   \   00001F 5F           CLRW      X
+   \   000020 72A9 000F    ADDW      Y, #0xf
+   \   000024 90FF         LDW       (Y), X
+    662          
+    663                  /* Remove this thread from the semaphore's suspend list */
+    664                  (void)tcbDequeueEntry (&timer_data_ptr->sem_ptr->suspQ, timer_data_ptr->tcb_ptr);
+   \   000026 91CE ..      LDW       Y, [S:?w4.w]
+   \   000029 BE ..        LDW       X, S:?w4
+   \   00002B 1C 0002      ADDW      X, #0x2
+   \   00002E FE           LDW       X, (X)
+   \   00002F CD ....      CALL      L:tcbDequeueEntry
+    665          
+    666                  /* Put the thread on the ready queue */
+    667                  (void)tcbEnqueuePriority (&tcbReadyQ, timer_data_ptr->tcb_ptr);
+   \   000032 91CE ..      LDW       Y, [S:?w4.w]
+   \   000035 AE ....      LDW       X, #tcbReadyQ
+   \   000038 CD ....      CALL      L:tcbEnqueuePriority
+    668          
+    669                  /* Exit critical region */
+    670                  CRITICAL_END ();
+   \   00003B B6 ..        LD        A, S:?b10
+   \   00003D B7 ..        LD        S:?b0, A
+   \   00003F 8A           PUSH      CC
+   \   000040 84           POP       A
+   \   000041 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000043 BA ..        OR        A, S:?b0
+   \   000045 88           PUSH      A
+   \   000046 86           POP       CC
+    671          
+    672                  /**
+    673                   * Note that we don't call the scheduler now as it will be called
+    674                   * when we exit the ISR by atomIntExit().
+    675                   */
+    676              }
+    677          }
+   \                     ??atomSemTimerCallback_0:
+   \   000047 32 ....      POP       S:?b10
+   \   00004A CC ....      JP        L:?epilogue_w4
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      18  atomSemCreate
+     177  atomSemDelete
+     282  atomSemGet
+     166  atomSemPut
+      12  atomSemResetCount
+      77  atomSemTimerCallback
+
+ 
+ 732 bytes in section .near_func.text
+ 
+ 732 bytes of CODE memory
+
+Errors: none
+Warnings: 1

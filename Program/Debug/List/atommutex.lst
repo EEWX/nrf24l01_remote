@@ -1,0 +1,1207 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:16
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atommutex.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atommutex.c"
+#        -e -Om --no_unroll --no_inline --no_tbaa --no_cross_call --debug
+#        --code_model small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\atommutex.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\atommutex.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atommutex.c
+      1          /*
+      2           * Copyright (c) 2010, Kelvin Lawson. All rights reserved.
+      3           *
+      4           * Redistribution and use in source and binary forms, with or without
+      5           * modification, are permitted provided that the following conditions
+      6           * are met:
+      7           *
+      8           * 1. Redistributions of source code must retain the above copyright
+      9           *    notice, this list of conditions and the following disclaimer.
+     10           * 2. Redistributions in binary form must reproduce the above copyright
+     11           *    notice, this list of conditions and the following disclaimer in the
+     12           *    documentation and/or other materials provided with the distribution.
+     13           * 3. No personal names or organizations' names associated with the
+     14           *    Atomthreads project may be used to endorse or promote products
+     15           *    derived from this software without specific prior written permission.
+     16           *
+     17           * THIS SOFTWARE IS PROVIDED BY THE ATOMTHREADS PROJECT AND CONTRIBUTORS
+     18           * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+     19           * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     20           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE
+     21           * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     22           * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     23           * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     24           * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     25           * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     26           * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     27           * POSSIBILITY OF SUCH DAMAGE.
+     28           */
+     29          
+     30          
+     31          /** 
+     32           * \file
+     33           * Mutex library.
+     34           *
+     35           *
+     36           * This module implements a mutual exclusion library with the following
+     37           * features:
+     38           *
+     39           * \par Flexible blocking APIs
+     40           * Threads which wish to take a mutex lock can choose whether to block,
+     41           * block with timeout, or not block if the mutex is already locked by a
+     42           * different thread.
+     43           *
+     44           * \par Interrupt-safe calls
+     45           * Some APIs can be called from interrupt context, but because a mutex
+     46           * must be owned by a particular thread the lock/unlock calls must be
+     47           * performed by threads only (i.e. it does not make sense to allow
+     48           * calls from interrupt context). All APIs are documented with their
+     49           * capability of being called from interrupt context. Any attempt to
+     50           * make a call which cannot be made from interrupt context will be
+     51           * automatically and safely prevented.
+     52           *
+     53           * \par Priority-based queueing
+     54           * Where multiple threads are blocking on a mutex, they are woken in
+     55           * order of the threads' priorities. Where multiple threads of the same
+     56           * priority are blocking, they are woken in FIFO order.
+     57           *
+     58           * \par Recursive locks
+     59           * A mutex can be locked recursively by the same thread up to a
+     60           * maximum recursion level of 255. An internal count of locks is
+     61           * maintained and the mutex is only released when the count reaches
+     62           * zero (when the thread has been unlocked the same number of times
+     63           * as it was locked). This makes a mutex more suitable for use as
+     64           * mutual exclusions than a semaphore with initial count of 1.
+     65           *
+     66           * \par Thread ownership
+     67           * Once a thread has locked a mutex, only that thread may release the
+     68           * lock. This is another feature which makes the mutex more suitable
+     69           * for mutual exclusion than a semaphore with initial count 1. It
+     70           * prevents programming errors whereby the wrong thread is used to
+     71           * perform the unlock. This cannot be done for semaphores which do not
+     72           * have a concept of ownership (because it must be possible to use them
+     73           * to signal between threads). 
+     74           *
+     75           * \par Smart mutex deletion
+     76           * Where a mutex is deleted while threads are blocking on it, all blocking
+     77           * threads are woken and returned a status code to indicate the reason for
+     78           * being woken.
+     79           *
+     80           *
+     81           * \n <b> Usage instructions: </b> \n
+     82           *
+     83           * All mutex objects must be initialised before use by calling
+     84           * atomMutexCreate(). Once initialised atomMutexGet() and atomMutexPut()
+     85           * are used to lock and unlock the mutex respectively. A mutex may be
+     86           * locked recursively by the same thread, allowing for simplified code
+     87           * structure.
+     88           *
+     89           * While a thread owns the lock on a mutex, no other thread can take the lock.
+     90           * These other threads will block until the mutex is released by the current
+     91           * owner (unless the calling parameters request no blocking, in which case the
+     92           * lock request will return with an error). If a mutex is released while
+     93           * threads are blocking on it, the highest priority thread is woken. Where
+     94           * multiple threads of the same priority are blocking, they are woken in the
+     95           * order in which the threads started blocking. 
+     96           *
+     97           * A mutex which is no longer required can be deleted using atomMutexDelete().
+     98           * This function automatically wakes up any threads which are waiting on the
+     99           * deleted mutex.
+    100           *
+    101           */
+    102          
+    103          
+    104          #include "atom.h"
+    105          #include "atommutex.h"
+    106          #include "atomtimer.h"
+    107          
+    108          
+    109          /* Local data types */
+    110          
+    111          typedef struct mutex_timer
+    112          {
+    113              ATOM_TCB *tcb_ptr;      /* Thread which is suspended with timeout */
+    114              ATOM_MUTEX *mutex_ptr;  /* Mutex the thread is suspended on */
+    115          } MUTEX_TIMER;
+    116          
+    117          
+    118          /* Forward declarations */
+    119          
+    120          static void atomMutexTimerCallback (POINTER cb_data);
+    121          
+    122          
+    123          /**
+    124           * \b atomMutexCreate
+    125           *
+    126           * Initialises a mutex object.
+    127           *
+    128           * Must be called before calling any other mutex library routines on a
+    129           * mutex. Objects can be deleted later using atomMutexDelete().
+    130           *
+    131           * Does not set the owner of a mutex. atomMutexGet() must be called after
+    132           * creation in order to actually take ownership.
+    133           *
+    134           * Does not allocate storage, the caller provides the mutex object.
+    135           *
+    136           * This function can be called from interrupt context.
+    137           *
+    138           * @param[in] mutex Pointer to mutex object
+    139           *
+    140           * @retval ATOM_OK Success
+    141           * @retval ATOM_ERR_PARAM Bad parameters
+    142           */
+
+   \                                 In section .near_func.text, align 1
+    143          uint8_t atomMutexCreate (ATOM_MUTEX *mutex)
+    144          {
+    145              uint8_t status;
+    146          
+    147              /* Parameter check */
+    148              if (mutex == NULL)
+   \                     atomMutexCreate:
+   \   000000 5D           TNZW      X
+   \   000001 26 03        JRNE      L:??atomMutexCreate_0
+    149              {
+    150                  /* Bad mutex pointer */
+    151                  status = ATOM_ERR_PARAM;
+   \   000003 A6 C9        LD        A, #0xc9
+   \   000005 81           RET
+    152              }
+    153              else
+    154              {
+    155                  /* Start with no owner (unlocked) */
+    156                  mutex->owner = NULL;
+   \                     ??atomMutexCreate_0:
+   \   000006 905F         CLRW      Y
+   \   000008 1C 0002      ADDW      X, #0x2
+   \   00000B FF           LDW       (X), Y
+   \   00000C 1D 0002      SUBW      X, #0x2
+    157          
+    158                  /* Reset the initial lock count */
+    159                  mutex->count = 0;
+   \   00000F 4F           CLR       A
+   \   000010 1C 0004      ADDW      X, #0x4
+   \   000013 F7           LD        (X), A
+   \   000014 1D 0004      SUBW      X, #0x4
+    160          
+    161                  /* Initialise the suspended threads queue */
+    162                  mutex->suspQ = NULL;
+   \   000017 FF           LDW       (X), Y
+    163          
+    164                  /* Successful */
+    165                  status = ATOM_OK;
+    166              }
+    167          
+    168              return (status);
+   \   000018 81           RET
+    169          }
+    170          
+    171          
+    172          /**
+    173           * \b atomMutexDelete
+    174           *
+    175           * Deletes a mutex object.
+    176           *
+    177           * Any threads currently suspended on the mutex will be woken up with
+    178           * return status ATOM_ERR_DELETED. If called at thread context then the
+    179           * scheduler will be called during this function which may schedule in one
+    180           * of the woken threads depending on relative priorities.
+    181           *
+    182           * This function can be called from interrupt context, but loops internally
+    183           * waking up all threads blocking on the mutex, so the potential
+    184           * execution cycles cannot be determined in advance.
+    185           *
+    186           * @param[in] mutex Pointer to mutex object
+    187           *
+    188           * @retval ATOM_OK Success
+    189           * @retval ATOM_ERR_QUEUE Problem putting a woken thread on the ready queue
+    190           * @retval ATOM_ERR_TIMER Problem cancelling a timeout on a woken thread
+    191           */
+
+   \                                 In section .near_func.text, align 1
+    192          uint8_t atomMutexDelete (ATOM_MUTEX *mutex)
+    193          {
+   \                     atomMutexDelete:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w7
+   \   000006 3B ....      PUSH      S:?b12
+   \   000009 BF ..        LDW       S:?w7, X
+    194              uint8_t status;
+    195              CRITICAL_STORE;
+    196              ATOM_TCB *tcb_ptr;
+    197              uint8_t woken_threads = FALSE;
+   \   00000B 3F ..        CLR       S:?b11
+    198          
+    199              /* Parameter check */
+    200              if (mutex == NULL)
+   \   00000D 5D           TNZW      X
+   \   00000E 26 07        JRNE      L:??atomMutexDelete_0
+    201              {
+    202                  /* Bad mutex pointer */
+    203                  status = ATOM_ERR_PARAM;
+   \   000010 35 C9 ....   MOV       S:?b10, #0xc9
+   \   000014 CC ....      JP        L:??atomMutexDelete_1
+    204              }
+    205              else
+    206              {
+    207                  /* Default to success status unless errors occur during wakeup */
+    208                  status = ATOM_OK;
+   \                     ??atomMutexDelete_0:
+   \   000017 3F ..        CLR       S:?b10
+   \   000019 20 16        JRA       L:??atomMutexDelete_2
+    209          
+    210                  /* Wake up all suspended tasks */
+    211                  while (1)
+    212                  {
+    213                      /* Enter critical region */
+    214                      CRITICAL_START ();
+    215          
+    216                      /* Check if any threads are suspended */
+    217                      tcb_ptr = tcbDequeueHead (&mutex->suspQ);
+    218          
+    219                      /* A thread is suspended on the mutex */
+    220                      if (tcb_ptr)
+    221                      {
+    222                          /* Return error status to the waiting thread */
+    223                          tcb_ptr->suspend_wake_status = ATOM_ERR_DELETED;
+    224          
+    225                          /* Put the thread on the ready queue */
+    226                          if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) != ATOM_OK)
+    227                          {
+    228                              /* Exit critical region */
+    229                              CRITICAL_END ();
+    230          
+    231                              /* Quit the loop, returning error */
+    232                              status = ATOM_ERR_QUEUE;
+    233                              break;
+    234                          }
+    235          
+    236                          /* If there's a timeout on this suspension, cancel it */
+    237                          if (tcb_ptr->suspend_timo_cb)
+    238                          {
+    239                              /* Cancel the callback */
+    240                              if (atomTimerCancel (tcb_ptr->suspend_timo_cb) != ATOM_OK)
+    241                              {
+    242                                  /* Exit critical region */
+    243                                  CRITICAL_END ();
+    244          
+    245                                  /* Quit the loop, returning error */
+    246                                  status = ATOM_ERR_TIMER;
+    247                                  break;
+    248                              }
+    249          
+    250                              /* Flag as no timeout registered */
+    251                              tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomMutexDelete_3:
+   \   00001B 5F           CLRW      X
+   \   00001C 90BE ..      LDW       Y, S:?w4
+   \   00001F 90FF         LDW       (Y), X
+    252          
+    253                          }
+    254          
+    255                          /* Exit critical region */
+    256                          CRITICAL_END ();
+   \                     ??atomMutexDelete_4:
+   \   000021 B6 ..        LD        A, S:?b12
+   \   000023 B7 ..        LD        S:?b0, A
+   \   000025 8A           PUSH      CC
+   \   000026 84           POP       A
+   \   000027 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000029 BA ..        OR        A, S:?b0
+   \   00002B 88           PUSH      A
+   \   00002C 86           POP       CC
+    257          
+    258                          /* Request a reschedule */
+    259                          woken_threads = TRUE;
+   \   00002D 35 01 ....   MOV       S:?b11, #0x1
+   \                     ??atomMutexDelete_2:
+   \   000031 8A           PUSH      CC
+   \   000032 84           POP       A
+   \   000033 A4 28        AND       A, #0x28
+   \   000035 B7 ..        LD        S:?b12, A
+   \   000037 9B           SIM
+   \   000038 BE ..        LDW       X, S:?w7
+   \   00003A CD ....      CALL      L:tcbDequeueHead
+   \   00003D BF ..        LDW       S:?w4, X
+   \   00003F 27 4A        JREQ      L:??atomMutexDelete_5
+   \   000041 A6 CA        LD        A, #0xca
+   \   000043 1C 000E      ADDW      X, #0xe
+   \   000046 F7           LD        (X), A
+   \   000047 90BE ..      LDW       Y, S:?w4
+   \   00004A AE ....      LDW       X, #tcbReadyQ
+   \   00004D CD ....      CALL      L:tcbEnqueuePriority
+   \   000050 A1 00        CP        A, #0x0
+   \   000052 27 12        JREQ      L:??atomMutexDelete_6
+   \   000054 B6 ..        LD        A, S:?b12
+   \   000056 B7 ..        LD        S:?b0, A
+   \   000058 8A           PUSH      CC
+   \   000059 84           POP       A
+   \   00005A A4 D7        AND       A, #0xffffffffffffffd7
+   \   00005C BA ..        OR        A, S:?b0
+   \   00005E 88           PUSH      A
+   \   00005F 86           POP       CC
+   \   000060 35 CC ....   MOV       S:?b10, #0xcc
+   \   000064 20 31        JRA       L:??atomMutexDelete_7
+   \                     ??atomMutexDelete_6:
+   \   000066 BE ..        LDW       X, S:?w4
+   \   000068 1C 000F      ADDW      X, #0xf
+   \   00006B BF ..        LDW       S:?w4, X
+   \   00006D 92CE ..      LDW       X, [S:?w4.w]
+   \   000070 27 AF        JREQ      L:??atomMutexDelete_4
+   \   000072 CD ....      CALL      L:atomTimerCancel
+   \   000075 A1 00        CP        A, #0x0
+   \   000077 27 A2        JREQ      L:??atomMutexDelete_3
+   \   000079 B6 ..        LD        A, S:?b12
+   \   00007B B7 ..        LD        S:?b0, A
+   \   00007D 8A           PUSH      CC
+   \   00007E 84           POP       A
+   \   00007F A4 D7        AND       A, #0xffffffffffffffd7
+   \   000081 BA ..        OR        A, S:?b0
+   \   000083 88           PUSH      A
+   \   000084 86           POP       CC
+   \   000085 35 CD ....   MOV       S:?b10, #0xcd
+   \   000089 20 0C        JRA       L:??atomMutexDelete_7
+    260                      }
+    261          
+    262                      /* No more suspended threads */
+    263                      else
+    264                      {
+    265                          /* Exit critical region and quit the loop */
+    266                          CRITICAL_END ();
+   \                     ??atomMutexDelete_5:
+   \   00008B B6 ..        LD        A, S:?b12
+   \   00008D B7 ..        LD        S:?b0, A
+   \   00008F 8A           PUSH      CC
+   \   000090 84           POP       A
+   \   000091 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000093 BA ..        OR        A, S:?b0
+   \   000095 88           PUSH      A
+   \   000096 86           POP       CC
+    267                          break;
+    268                      }
+    269                  }
+    270          
+    271                  /* Call scheduler if any threads were woken up */
+    272                  if (woken_threads == TRUE)
+   \                     ??atomMutexDelete_7:
+   \   000097 B6 ..        LD        A, S:?b11
+   \   000099 4A           DEC       A
+   \   00009A 26 0A        JRNE      L:??atomMutexDelete_1
+    273                  {
+    274                      /**
+    275                       * Only call the scheduler if we are in thread context, otherwise
+    276                       * it will be called on exiting the ISR by atomIntExit().
+    277                       */
+    278                      if (atomCurrentContext())
+   \   00009C CD ....      CALL      L:atomCurrentContext
+   \   00009F 5D           TNZW      X
+   \   0000A0 27 04        JREQ      L:??atomMutexDelete_1
+    279                          atomSched (FALSE);
+   \   0000A2 4F           CLR       A
+   \   0000A3 CD ....      CALL      L:atomSched
+    280                  }
+    281              }
+    282          
+    283              return (status);
+   \                     ??atomMutexDelete_1:
+   \   0000A6 B6 ..        LD        A, S:?b10
+   \   0000A8 32 ....      POP       S:?b12
+   \   0000AB CD ....      CALL      L:?pop_w7
+   \   0000AE CC ....      JP        L:?epilogue_l2
+    284          }
+    285          
+    286          
+    287          /**
+    288           * \b atomMutexGet
+    289           *
+    290           * Take the lock on a mutex.
+    291           *
+    292           * This takes ownership of a mutex if it is not currently owned. Ownership
+    293           * is held by this thread until a corresponding call to atomMutexPut() by
+    294           * the same thread.
+    295           *
+    296           * Can be called recursively by the original locking thread (owner).
+    297           * Recursive calls are counted, and ownership is not relinquished until
+    298           * the number of unlock (atomMutexPut()) calls by the owner matches the
+    299           * number of lock (atomMutexGet()) calls.
+    300           *
+    301           * No thread other than the owner can lock or unlock the mutex while it is
+    302           * locked by another thread.
+    303           *
+    304           * Depending on the \c timeout value specified the call will do one of
+    305           * the following if the mutex is already locked by another thread:
+    306           *
+    307           * \c timeout == 0 : Call will block until the mutex is available \n
+    308           * \c timeout > 0 : Call will block until available up to the specified timeout \n
+    309           * \c timeout == -1 : Return immediately if mutex is locked by another thread \n
+    310          *
+    311           * If the call needs to block and \c timeout is zero, it will block
+    312           * indefinitely until the owning thread calls atomMutexPut() or
+    313           * atomMutexDelete() is called on the mutex.
+    314           *
+    315           * If the call needs to block and \c timeout is non-zero, the call will only
+    316           * block for the specified number of system ticks after which time, if the
+    317           * thread was not already woken, the call will return with \c ATOM_TIMEOUT.
+    318           *
+    319           * If the call would normally block and \c timeout is -1, the call will
+    320           * return immediately with \c ATOM_WOULDBLOCK.
+    321           *
+    322           * This function can only be called from thread context. A mutex has the
+    323           * concept of an owner thread, so it is never valid to make a mutex call
+    324           * from interrupt context when there is no thread to associate with.
+    325           *
+    326           * @param[in] mutex Pointer to mutex object
+    327           * @param[in] timeout Max system ticks to block (0 = forever)
+    328           *
+    329           * @retval ATOM_OK Success
+    330           * @retval ATOM_TIMEOUT Mutex timed out before being woken
+    331           * @retval ATOM_WOULDBLOCK Called with timeout == -1 but count is zero
+    332           * @retval ATOM_ERR_DELETED Mutex was deleted while suspended
+    333           * @retval ATOM_ERR_CONTEXT Not called in thread context and attempted to block
+    334           * @retval ATOM_ERR_PARAM Bad parameter
+    335           * @retval ATOM_ERR_QUEUE Problem putting the thread on the suspend queue
+    336           * @retval ATOM_ERR_TIMER Problem registering the timeout
+    337           * @retval ATOM_ERR_OVF The recursive lock count would have overflowed (>255)
+    338           */
+
+   \                                 In section .near_func.text, align 1
+    339          uint8_t atomMutexGet (ATOM_MUTEX *mutex, int32_t timeout)
+    340          {
+   \                     atomMutexGet:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 89           PUSHW     X
+   \   000007 52 0E        SUB       SP, #0xe
+   \   000009 CD ....      CALL      L:?mov_l3_l0
+    341              CRITICAL_STORE;
+    342              uint8_t status;
+    343              MUTEX_TIMER timer_data;
+    344              ATOM_TIMER timer_cb;
+    345              ATOM_TCB *curr_tcb_ptr;
+    346          
+    347              /* Check parameters */
+    348              if (mutex == NULL)
+   \   00000C 1E 0F        LDW       X, (0xf,SP)
+   \   00000E 26 07        JRNE      L:??atomMutexGet_0
+    349              {
+    350                  /* Bad mutex pointer */
+    351                  status = ATOM_ERR_PARAM;
+   \   000010 35 C9 ....   MOV       S:?b11, #0xc9
+   \   000014 CC ....      JP        L:??atomMutexGet_1
+    352              }
+    353              else
+    354              {
+    355                  /* Get the current TCB */
+    356                  curr_tcb_ptr = atomCurrentContext();
+   \                     ??atomMutexGet_0:
+   \   000017 CD ....      CALL      L:atomCurrentContext
+   \   00001A BF ..        LDW       S:?w4, X
+    357          
+    358                  /* Protect access to the mutex object and OS queues */
+    359                  CRITICAL_START ();
+   \   00001C 8A           PUSH      CC
+   \   00001D 84           POP       A
+   \   00001E A4 28        AND       A, #0x28
+   \   000020 B7 ..        LD        S:?b10, A
+   \   000022 9B           SIM
+    360          
+    361                  /**
+    362                   * Check we are at thread context. Because mutexes have the concept of
+    363                   * owner threads, it is never valid to call here from an ISR,
+    364                   * regardless of whether we will block.
+    365                   */
+    366                  if (curr_tcb_ptr == NULL)
+   \   000023 5D           TNZW      X
+   \   000024 26 11        JRNE      L:??atomMutexGet_2
+    367                  {
+    368                      /* Exit critical region */
+    369                      CRITICAL_END ();
+   \   000026 B7 ..        LD        S:?b0, A
+   \   000028 8A           PUSH      CC
+   \   000029 84           POP       A
+   \   00002A A4 D7        AND       A, #0xffffffffffffffd7
+   \   00002C BA ..        OR        A, S:?b0
+   \   00002E 88           PUSH      A
+   \   00002F 86           POP       CC
+    370          
+    371                      /* Not currently in thread context, can't suspend */
+    372                      status = ATOM_ERR_CONTEXT;
+   \   000030 35 C8 ....   MOV       S:?b11, #0xc8
+   \   000034 CC ....      JP        L:??atomMutexGet_1
+    373                  }
+    374          
+    375                  /* Otherwise if mutex is owned by another thread, block the calling thread */
+    376                  else if ((mutex->owner != NULL) && (mutex->owner != curr_tcb_ptr))
+   \                     ??atomMutexGet_2:
+   \   000037 1E 0F        LDW       X, (0xf,SP)
+   \   000039 5C           INCW      X
+   \   00003A 5C           INCW      X
+   \   00003B 9093         LDW       Y, X
+   \   00003D FE           LDW       X, (X)
+   \   00003E 26 03        JRNE      ??lb_0
+   \   000040 CC ....      JP        L:??atomMutexGet_3
+   \                     ??lb_0:
+   \   000043 B3 ..        CPW       X, S:?w4
+   \   000045 26 03        JRNE      ??lb_1
+   \   000047 CC ....      JP        L:??atomMutexGet_3
+    377                  {
+    378                      /* If called with timeout >= 0, we should block */
+    379                      if (timeout >= 0)
+   \                     ??lb_1:
+   \   00004A 3D ..        TNZ       S:?b12
+   \   00004C 2A 03        JRPL      ??lb_2
+   \   00004E CC ....      JP        L:??atomMutexGet_4
+    380                      {
+    381                          /* Add current thread to the suspend list on this mutex */
+    382                          if (tcbEnqueuePriority (&mutex->suspQ, curr_tcb_ptr) != ATOM_OK)
+   \                     ??lb_2:
+   \   000051 90BE ..      LDW       Y, S:?w4
+   \   000054 1E 0F        LDW       X, (0xf,SP)
+   \   000056 CD ....      CALL      L:tcbEnqueuePriority
+   \   000059 A1 00        CP        A, #0x0
+   \   00005B 27 13        JREQ      L:??atomMutexGet_5
+    383                          {
+    384                              /* Exit critical region */
+    385                              CRITICAL_END ();
+   \   00005D B6 ..        LD        A, S:?b10
+   \   00005F B7 ..        LD        S:?b0, A
+   \   000061 8A           PUSH      CC
+   \   000062 84           POP       A
+   \   000063 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000065 BA ..        OR        A, S:?b0
+   \   000067 88           PUSH      A
+   \   000068 86           POP       CC
+    386          
+    387                              /* There was an error putting this thread on the suspend list */
+    388                              status = ATOM_ERR_QUEUE;
+   \   000069 35 CC ....   MOV       S:?b11, #0xcc
+   \   00006D CC ....      JP        L:??atomMutexGet_1
+    389                          }
+   \                     ??atomMutexGet_5:
+   \   000070 A6 01        LD        A, #0x1
+   \   000072 BE ..        LDW       X, S:?w4
+   \   000074 1C 000D      ADDW      X, #0xd
+   \   000077 F7           LD        (X), A
+    390                          else
+    391                          {
+    392                              /* Set suspended status for the current thread */
+    393                              curr_tcb_ptr->suspended = TRUE;
+    394          
+    395                              /* Track errors */
+    396                              status = ATOM_OK;
+   \   000078 3F ..        CLR       S:?b11
+   \   00007A BE ..        LDW       X, S:?w6
+   \   00007C 26 02        JRNE      L:??atomMutexGet_6
+   \   00007E BE ..        LDW       X, S:?w7
+   \                     ??atomMutexGet_6:
+   \   000080 27 4C        JREQ      L:??atomMutexGet_7
+    397          
+    398                              /* Register a timer callback if requested */
+    399                              if (timeout)
+    400                              {
+    401                                  /* Fill out the data needed by the callback to wake us up */
+    402                                  timer_data.tcb_ptr = curr_tcb_ptr;
+   \   000082 BE ..        LDW       X, S:?w4
+   \   000084 1F 01        LDW       (0x1,SP), X
+    403                                  timer_data.mutex_ptr = mutex;
+   \   000086 1E 0F        LDW       X, (0xf,SP)
+   \   000088 1F 03        LDW       (0x3,SP), X
+    404          
+    405                                  /* Fill out the timer callback request structure */
+    406                                  timer_cb.cb_func = atomMutexTimerCallback;
+   \   00008A AE ....      LDW       X, #atomMutexTimerCallback
+   \   00008D 1F 05        LDW       (0x5,SP), X
+    407                                  timer_cb.cb_data = (POINTER)&timer_data;
+   \   00008F 96           LDW       X, SP
+   \   000090 5C           INCW      X
+   \   000091 1F 07        LDW       (0x7,SP), X
+    408                                  timer_cb.cb_ticks = timeout;
+   \   000093 CD ....      CALL      L:?load32_dbsp_l3
+   \   000096 09           DC8       0x9
+    409          
+    410                                  /**
+    411                                   * Store the timer details in the TCB so that we can
+    412                                   * cancel the timer callback if the mutex is put
+    413                                   * before the timeout occurs.
+    414                                   */
+    415                                  curr_tcb_ptr->suspend_timo_cb = &timer_cb;
+   \   000097 96           LDW       X, SP
+   \   000098 1C 0005      ADDW      X, #0x5
+   \   00009B 90BE ..      LDW       Y, S:?w4
+   \   00009E 72A9 000F    ADDW      Y, #0xf
+   \   0000A2 90FF         LDW       (Y), X
+    416          
+    417                                  /* Register a callback on timeout */
+    418                                  if (atomTimerRegister (&timer_cb) != ATOM_OK)
+   \   0000A4 96           LDW       X, SP
+   \   0000A5 1C 0005      ADDW      X, #0x5
+   \   0000A8 CD ....      CALL      L:atomTimerRegister
+   \   0000AB A1 00        CP        A, #0x0
+   \   0000AD 27 29        JREQ      L:??atomMutexGet_8
+    419                                  {
+    420                                      /* Timer registration failed */
+    421                                      status = ATOM_ERR_TIMER;
+   \   0000AF 35 CD ....   MOV       S:?b11, #0xcd
+    422          
+    423                                      /* Clean up and return to the caller */
+    424                                      (void)tcbDequeueEntry (&mutex->suspQ, curr_tcb_ptr);
+   \   0000B3 90BE ..      LDW       Y, S:?w4
+   \   0000B6 1E 0F        LDW       X, (0xf,SP)
+   \   0000B8 CD ....      CALL      L:tcbDequeueEntry
+    425                                      curr_tcb_ptr->suspended = FALSE;
+   \   0000BB 4F           CLR       A
+   \   0000BC BE ..        LDW       X, S:?w4
+   \   0000BE 1C 000D      ADDW      X, #0xd
+   \   0000C1 F7           LD        (X), A
+    426                                      curr_tcb_ptr->suspend_timo_cb = NULL;
+   \   0000C2 5F           CLRW      X
+   \   0000C3 90BE ..      LDW       Y, S:?w4
+   \   0000C6 72A9 000F    ADDW      Y, #0xf
+   \   0000CA 90FF         LDW       (Y), X
+   \   0000CC 20 0A        JRA       L:??atomMutexGet_8
+    427                                  }
+    428                              }
+    429          
+    430                              /* Set no timeout requested */
+    431                              else
+    432                              {
+    433                                  /* No need to cancel timeouts on this one */
+    434                                  curr_tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomMutexGet_7:
+   \   0000CE 5F           CLRW      X
+   \   0000CF 90BE ..      LDW       Y, S:?w4
+   \   0000D2 72A9 000F    ADDW      Y, #0xf
+   \   0000D6 90FF         LDW       (Y), X
+    435                              }
+    436          
+    437                              /* Exit critical region */
+    438                              CRITICAL_END ();
+   \                     ??atomMutexGet_8:
+   \   0000D8 B6 ..        LD        A, S:?b10
+   \   0000DA B7 ..        LD        S:?b0, A
+   \   0000DC 8A           PUSH      CC
+   \   0000DD 84           POP       A
+   \   0000DE A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000E0 BA ..        OR        A, S:?b0
+   \   0000E2 88           PUSH      A
+   \   0000E3 86           POP       CC
+    439          
+    440                              /* Check no errors have occurred */
+    441                              if (status == ATOM_OK)
+   \   0000E4 3D ..        TNZ       S:?b11
+   \   0000E6 26 51        JRNE      L:??atomMutexGet_1
+    442                              {
+    443                                  /**
+    444                                   * Current thread now blocking, schedule in a new
+    445                                   * one. We already know we are in thread context
+    446                                   * so can call the scheduler from here.
+    447                                   */
+    448                                  atomSched (FALSE);
+   \   0000E8 4F           CLR       A
+   \   0000E9 CD ....      CALL      L:atomSched
+    449          
+    450                                  /**
+    451                                   * Normal atomMutexPut() wakeups will set ATOM_OK status,
+    452                                   * while timeouts will set ATOM_TIMEOUT and mutex
+    453                                   * deletions will set ATOM_ERR_DELETED. */
+    454                                  status = curr_tcb_ptr->suspend_wake_status;
+   \   0000EC BE ..        LDW       X, S:?w4
+   \   0000EE 1C 000E      ADDW      X, #0xe
+   \   0000F1 F6           LD        A, (X)
+   \   0000F2 B7 ..        LD        S:?b11, A
+    455          
+    456                                  /**
+    457                                   * If we were woken up by another thread relinquishing
+    458                                   * the mutex and handing this thread ownership, then
+    459                                   * the relinquishing thread will set status to ATOM_OK
+    460                                   * and will make this thread the owner. Setting the
+    461                                   * owner before waking the thread ensures that no other
+    462                                   * thread can preempt and take ownership of the mutex
+    463                                   * between this thread being made ready to run, and
+    464                                   * actually being scheduled back in here.
+    465                                   */
+    466                                  if (status == ATOM_OK)
+   \   0000F4 26 43        JRNE      L:??atomMutexGet_1
+    467                                  {
+    468                                      /**
+    469                                       * Since this thread has just gained ownership, the
+    470                                       * lock count is zero and should be incremented
+    471                                       * once for this call.
+    472                                       */
+    473                                      mutex->count++;
+   \   0000F6 1E 0F        LDW       X, (0xf,SP)
+   \   0000F8 1C 0004      ADDW      X, #0x4
+   \   0000FB F6           LD        A, (X)
+   \   0000FC 4C           INC       A
+   \   0000FD F7           LD        (X), A
+   \   0000FE 20 39        JRA       L:??atomMutexGet_1
+    474                                  }
+    475                              }
+    476                          }
+    477                      }
+    478                      else
+    479                      {
+    480                          /* timeout == -1, requested not to block and mutex is owned by another thread */
+    481                          CRITICAL_END();
+   \                     ??atomMutexGet_4:
+   \   000100 B7 ..        LD        S:?b0, A
+   \   000102 8A           PUSH      CC
+   \   000103 84           POP       A
+   \   000104 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000106 BA ..        OR        A, S:?b0
+   \   000108 88           PUSH      A
+   \   000109 86           POP       CC
+    482                          status = ATOM_WOULDBLOCK;
+   \   00010A 35 03 ....   MOV       S:?b11, #0x3
+   \   00010E 20 29        JRA       L:??atomMutexGet_1
+    483                      }
+    484                  }
+    485                  else
+    486                  {
+    487                      /* Thread is not owned or is owned by us, we can claim ownership */
+    488          
+    489                      /* Increment the lock count, checking for count overflow */
+    490                      if (mutex->count == 255)
+   \                     ??atomMutexGet_3:
+   \   000110 1E 0F        LDW       X, (0xf,SP)
+   \   000112 1C 0004      ADDW      X, #0x4
+   \   000115 F6           LD        A, (X)
+   \   000116 A1 FF        CP        A, #0xff
+   \   000118 26 06        JRNE      L:??atomMutexGet_9
+    491                      {
+    492                          /* Don't increment, just return error status */
+    493                          status = ATOM_ERR_OVF;
+   \   00011A 35 CB ....   MOV       S:?b11, #0xcb
+   \   00011E 20 0D        JRA       L:??atomMutexGet_10
+    494                      }
+    495                      else
+    496                      {
+    497                          /* Increment the count and return to the calling thread */
+    498                          mutex->count++;
+   \                     ??atomMutexGet_9:
+   \   000120 AB 01        ADD       A, #0x1
+   \   000122 F7           LD        (X), A
+    499          
+    500                          /* If the mutex is not locked, mark the calling thread as the new owner */
+    501                          if (mutex->owner == NULL)
+   \   000123 93           LDW       X, Y
+   \   000124 FE           LDW       X, (X)
+   \   000125 26 04        JRNE      L:??atomMutexGet_11
+    502                          {
+    503                              mutex->owner = curr_tcb_ptr;
+   \   000127 BE ..        LDW       X, S:?w4
+   \   000129 90FF         LDW       (Y), X
+    504                          }
+    505          
+    506                          /* Successful */
+    507                          status = ATOM_OK;
+   \                     ??atomMutexGet_11:
+   \   00012B 3F ..        CLR       S:?b11
+    508                      }
+    509          
+    510                      /* Exit critical region */
+    511                      CRITICAL_END ();
+   \                     ??atomMutexGet_10:
+   \   00012D B6 ..        LD        A, S:?b10
+   \   00012F B7 ..        LD        S:?b0, A
+   \   000131 8A           PUSH      CC
+   \   000132 84           POP       A
+   \   000133 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000135 BA ..        OR        A, S:?b0
+   \   000137 88           PUSH      A
+   \   000138 86           POP       CC
+    512                  }
+    513              }
+    514          
+    515              return (status);
+   \                     ??atomMutexGet_1:
+   \   000139 B6 ..        LD        A, S:?b11
+   \   00013B 5B 10        ADD       SP, #0x10
+   \   00013D CC ....      JP        L:?epilogue_l2_l3
+    516          }
+    517          
+    518          
+    519          /**
+    520           * \b atomMutexPut
+    521           *
+    522           * Give back the lock on a mutex.
+    523           *
+    524           * This checks that the mutex is owned by the calling thread, and decrements
+    525           * the recursive lock count. Once the lock count reaches zero, the lock is
+    526           * considered relinquished and no longer owned by this thread.
+    527           *
+    528           * If the lock is relinquished and there are threads blocking on the mutex, the
+    529           * call will wake up the highest priority thread suspended. Only one thread is
+    530           * woken per call to atomMutexPut(). If multiple threads of the same priority
+    531           * are suspended, they are woken in order of suspension (FIFO).
+    532           *
+    533           * This function can only be called from thread context. A mutex has the
+    534           * concept of an owner thread, so it is never valid to make a mutex call
+    535           * from interrupt context when there is no thread to associate with.
+    536           *
+    537           * @param[in] mutex Pointer to mutex object
+    538           *
+    539           * @retval ATOM_OK Success
+    540           * @retval ATOM_ERR_PARAM Bad parameter
+    541           * @retval ATOM_ERR_QUEUE Problem putting a woken thread on the ready queue
+    542           * @retval ATOM_ERR_TIMER Problem cancelling a timeout for a woken thread
+    543           * @retval ATOM_ERR_OWNERSHIP Attempt to unlock mutex not owned by this thread
+    544           */
+
+   \                                 In section .near_func.text, align 1
+    545          uint8_t atomMutexPut (ATOM_MUTEX * mutex)
+    546          {
+   \                     atomMutexPut:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 CD ....      CALL      L:?push_w6
+   \   000006 3B ....      PUSH      S:?b10
+   \   000009 BF ..        LDW       S:?w4, X
+    547              uint8_t status;
+    548              CRITICAL_STORE;
+    549              ATOM_TCB *tcb_ptr, *curr_tcb_ptr;
+    550          
+    551              /* Check parameters */
+    552              if (mutex == NULL)
+   \   00000B 26 07        JRNE      L:??atomMutexPut_0
+    553              {
+    554                  /* Bad mutex pointer */
+    555                  status = ATOM_ERR_PARAM;
+   \   00000D 35 C9 ....   MOV       S:?b8, #0xc9
+   \   000011 CC ....      JP        L:??atomMutexPut_1
+    556              }
+    557              else
+    558              {
+    559                  /* Get the current TCB */
+    560                  curr_tcb_ptr = atomCurrentContext();
+   \                     ??atomMutexPut_0:
+   \   000014 CD ....      CALL      L:atomCurrentContext
+   \   000017 9093         LDW       Y, X
+    561          
+    562                  /* Protect access to the mutex object and OS queues */
+    563                  CRITICAL_START ();
+   \   000019 8A           PUSH      CC
+   \   00001A 84           POP       A
+   \   00001B A4 28        AND       A, #0x28
+   \   00001D B7 ..        LD        S:?b10, A
+   \   00001F 9B           SIM
+    564          
+    565                  /* Check if the calling thread owns this mutex */
+    566                  if (mutex->owner != curr_tcb_ptr)
+   \   000020 BE ..        LDW       X, S:?w4
+   \   000022 1C 0002      ADDW      X, #0x2
+   \   000025 BF ..        LDW       S:?w6, X
+   \   000027 93           LDW       X, Y
+   \   000028 92C3 ..      CPW       X, [S:?w6.w]
+   \   00002B 27 11        JREQ      L:??atomMutexPut_2
+    567                  {
+    568                      /* Exit critical region */
+    569                      CRITICAL_END ();
+   \   00002D B7 ..        LD        S:?b0, A
+   \   00002F 8A           PUSH      CC
+   \   000030 84           POP       A
+   \   000031 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000033 BA ..        OR        A, S:?b0
+   \   000035 88           PUSH      A
+   \   000036 86           POP       CC
+    570          
+    571                      /* Attempt to unlock by non-owning thread */
+    572                      status = ATOM_ERR_OWNERSHIP;
+   \   000037 35 CF ....   MOV       S:?b8, #0xcf
+   \   00003B CC ....      JP        L:??atomMutexPut_1
+    573                  }
+    574                  else
+    575                  {
+    576                      /* Lock is owned by this thread, decrement the recursive lock count */
+    577                      mutex->count--;
+   \                     ??atomMutexPut_2:
+   \   00003E BE ..        LDW       X, S:?w4
+   \   000040 1C 0004      ADDW      X, #0x4
+   \   000043 F6           LD        A, (X)
+   \   000044 4A           DEC       A
+   \   000045 F7           LD        (X), A
+    578          
+    579                      /* Once recursive lock count reaches zero, we relinquish ownership */
+    580                      if (mutex->count == 0)
+   \   000046 26 6A        JRNE      L:??atomMutexPut_3
+    581                      {
+    582                          /* Relinquish ownership */
+    583                          mutex->owner = NULL;
+   \   000048 5F           CLRW      X
+   \   000049 92CF ..      LDW       [S:?w6.w], X
+    584          
+    585                          /* If any threads are blocking on this mutex, wake them now */
+    586                          if (mutex->suspQ)
+   \   00004C 92CE ..      LDW       X, [S:?w4.w]
+   \   00004F 27 61        JREQ      L:??atomMutexPut_3
+    587                          {
+    588                              /**
+    589                               * Threads are woken up in priority order, with a FIFO system
+    590                               * used on same priority threads. We always take the head,
+    591                               * ordering is taken care of by an ordered list enqueue.
+    592                               */
+    593                              tcb_ptr = tcbDequeueHead (&mutex->suspQ);
+   \   000051 BE ..        LDW       X, S:?w4
+   \   000053 CD ....      CALL      L:tcbDequeueHead
+   \   000056 BF ..        LDW       S:?w4, X
+    594                              if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) != ATOM_OK)
+   \   000058 90BE ..      LDW       Y, S:?w4
+   \   00005B AE ....      LDW       X, #tcbReadyQ
+   \   00005E CD ....      CALL      L:tcbEnqueuePriority
+   \   000061 A1 00        CP        A, #0x0
+   \   000063 27 12        JREQ      L:??atomMutexPut_4
+    595                              {
+    596                                  /* Exit critical region */
+    597                                  CRITICAL_END ();
+   \   000065 B6 ..        LD        A, S:?b10
+   \   000067 B7 ..        LD        S:?b0, A
+   \   000069 8A           PUSH      CC
+   \   00006A 84           POP       A
+   \   00006B A4 D7        AND       A, #0xffffffffffffffd7
+   \   00006D BA ..        OR        A, S:?b0
+   \   00006F 88           PUSH      A
+   \   000070 86           POP       CC
+    598          
+    599                                  /* There was a problem putting the thread on the ready queue */
+    600                                  status = ATOM_ERR_QUEUE;
+   \   000071 35 CC ....   MOV       S:?b8, #0xcc
+   \   000075 20 49        JRA       L:??atomMutexPut_1
+    601                              }
+    602                              else
+    603                              {
+    604                                  /* Set OK status to be returned to the waiting thread */
+    605                                  tcb_ptr->suspend_wake_status = ATOM_OK;
+   \                     ??atomMutexPut_4:
+   \   000077 4F           CLR       A
+   \   000078 BE ..        LDW       X, S:?w4
+   \   00007A 1C 000E      ADDW      X, #0xe
+   \   00007D F7           LD        (X), A
+    606          
+    607                                  /* Set this thread as the new owner of the mutex */
+    608                                  mutex->owner = tcb_ptr;
+   \   00007E BE ..        LDW       X, S:?w4
+   \   000080 92CF ..      LDW       [S:?w6.w], X
+    609          
+    610                                  /* If there's a timeout on this suspension, cancel it */
+    611                                  if ((tcb_ptr->suspend_timo_cb != NULL)
+    612                                      && (atomTimerCancel (tcb_ptr->suspend_timo_cb) != ATOM_OK))
+   \   000083 1C 000F      ADDW      X, #0xf
+   \   000086 BF ..        LDW       S:?w4, X
+   \   000088 92CE ..      LDW       X, [S:?w4.w]
+   \   00008B 27 0D        JREQ      L:??atomMutexPut_5
+   \   00008D CD ....      CALL      L:atomTimerCancel
+   \   000090 A1 00        CP        A, #0x0
+   \   000092 27 06        JREQ      L:??atomMutexPut_5
+    613                                  {
+    614                                      /* There was a problem cancelling a timeout on this mutex */
+    615                                      status = ATOM_ERR_TIMER;
+   \   000094 35 CD ....   MOV       S:?b8, #0xcd
+   \   000098 20 06        JRA       L:??atomMutexPut_6
+    616                                  }
+    617                                  else
+    618                                  {
+    619                                      /* Flag as no timeout registered */
+    620                                      tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomMutexPut_5:
+   \   00009A 5F           CLRW      X
+   \   00009B 92CF ..      LDW       [S:?w4.w], X
+    621          
+    622                                      /* Successful */
+    623                                      status = ATOM_OK;
+   \   00009E 3F ..        CLR       S:?b8
+    624                                  }
+    625          
+    626                                  /* Exit critical region */
+    627                                  CRITICAL_END ();
+   \                     ??atomMutexPut_6:
+   \   0000A0 B6 ..        LD        A, S:?b10
+   \   0000A2 B7 ..        LD        S:?b0, A
+   \   0000A4 8A           PUSH      CC
+   \   0000A5 84           POP       A
+   \   0000A6 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000A8 BA ..        OR        A, S:?b0
+   \   0000AA 88           PUSH      A
+   \   0000AB 86           POP       CC
+    628          
+    629                                  /**
+    630                                   * The scheduler may now make a policy decision to
+    631                                   * thread switch. We already know we are in thread
+    632                                   * context so can call the scheduler from here.
+    633                                   */
+    634                                  atomSched (FALSE);
+   \   0000AC 4F           CLR       A
+   \   0000AD CD ....      CALL      L:atomSched
+   \   0000B0 20 0E        JRA       L:??atomMutexPut_1
+    635                              }
+    636                          }
+    637                          else
+    638                          {
+    639                              /**
+    640                               * Relinquished ownership and no threads waiting.
+    641                               * Nothing to do.
+    642                               */
+    643          
+    644                              /* Exit critical region */
+    645                              CRITICAL_END ();
+    646          
+    647                              /* Successful */
+    648                              status = ATOM_OK;
+    649                          }
+    650                      }
+    651                      else
+    652                      {
+    653                          /**
+    654                           * Decremented lock but still retain ownership due to
+    655                           * recursion. Nothing to do.
+    656                           */
+    657          
+    658                          /* Exit critical region */
+    659                          CRITICAL_END ();
+   \                     ??atomMutexPut_3:
+   \   0000B2 B6 ..        LD        A, S:?b10
+   \   0000B4 B7 ..        LD        S:?b0, A
+   \   0000B6 8A           PUSH      CC
+   \   0000B7 84           POP       A
+   \   0000B8 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000BA BA ..        OR        A, S:?b0
+   \   0000BC 88           PUSH      A
+   \   0000BD 86           POP       CC
+    660          
+    661                          /* Successful */
+    662                          status = ATOM_OK;
+   \   0000BE 3F ..        CLR       S:?b8
+    663                      }
+    664                  }
+    665              }
+    666          
+    667              return (status);
+   \                     ??atomMutexPut_1:
+   \   0000C0 B6 ..        LD        A, S:?b8
+   \   0000C2 32 ....      POP       S:?b10
+   \   0000C5 CD ....      CALL      L:?pop_w6
+   \   0000C8 CC ....      JP        L:?epilogue_w4
+    668          }
+    669          
+    670          
+    671          /**
+    672           * \b atomMutexTimerCallback
+    673           *
+    674           * This is an internal function not for use by application code.
+    675           *
+    676           * Timeouts on suspended threads are notified by the timer system through
+    677           * this generic callback. The timer system calls us back with a pointer to
+    678           * the relevant \c MUTEX_TIMER object which is used to retrieve the
+    679           * mutex details.
+    680           *
+    681           * @param[in] cb_data Pointer to a MUTEX_TIMER object
+    682           */
+
+   \                                 In section .near_func.text, align 1
+    683          static void atomMutexTimerCallback (POINTER cb_data)
+    684          {
+   \                     atomMutexTimerCallback:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 3B ....      PUSH      S:?b10
+   \   000006 BF ..        LDW       S:?w4, X
+    685              MUTEX_TIMER *timer_data_ptr;
+    686              CRITICAL_STORE;
+    687          
+    688              /* Get the MUTEX_TIMER structure pointer */
+    689              timer_data_ptr = (MUTEX_TIMER *)cb_data;
+    690          
+    691              /* Check parameter is valid */
+    692              if (timer_data_ptr)
+   \   000008 27 3D        JREQ      L:??atomMutexTimerCallback_0
+    693              {
+    694                  /* Enter critical region */
+    695                  CRITICAL_START ();
+   \   00000A 8A           PUSH      CC
+   \   00000B 84           POP       A
+   \   00000C A4 28        AND       A, #0x28
+   \   00000E B7 ..        LD        S:?b10, A
+   \   000010 9B           SIM
+    696          
+    697                  /* Set status to indicate to the waiting thread that it timed out */
+    698                  timer_data_ptr->tcb_ptr->suspend_wake_status = ATOM_TIMEOUT;
+   \   000011 92CE ..      LDW       X, [S:?w4.w]
+   \   000014 1C 000E      ADDW      X, #0xe
+   \   000017 A6 02        LD        A, #0x2
+   \   000019 F7           LD        (X), A
+    699          
+    700                  /* Flag as no timeout registered */
+    701                  timer_data_ptr->tcb_ptr->suspend_timo_cb = NULL;
+   \   00001A 92CE ..      LDW       X, [S:?w4.w]
+   \   00001D 9093         LDW       Y, X
+   \   00001F 5F           CLRW      X
+   \   000020 72A9 000F    ADDW      Y, #0xf
+   \   000024 90FF         LDW       (Y), X
+    702          
+    703                  /* Remove this thread from the mutex's suspend list */
+    704                  (void)tcbDequeueEntry (&timer_data_ptr->mutex_ptr->suspQ, timer_data_ptr->tcb_ptr);
+   \   000026 91CE ..      LDW       Y, [S:?w4.w]
+   \   000029 BE ..        LDW       X, S:?w4
+   \   00002B 1C 0002      ADDW      X, #0x2
+   \   00002E FE           LDW       X, (X)
+   \   00002F CD ....      CALL      L:tcbDequeueEntry
+    705          
+    706                  /* Put the thread on the ready queue */
+    707                  (void)tcbEnqueuePriority (&tcbReadyQ, timer_data_ptr->tcb_ptr);
+   \   000032 91CE ..      LDW       Y, [S:?w4.w]
+   \   000035 AE ....      LDW       X, #tcbReadyQ
+   \   000038 CD ....      CALL      L:tcbEnqueuePriority
+    708          
+    709                  /* Exit critical region */
+    710                  CRITICAL_END ();
+   \   00003B B6 ..        LD        A, S:?b10
+   \   00003D B7 ..        LD        S:?b0, A
+   \   00003F 8A           PUSH      CC
+   \   000040 84           POP       A
+   \   000041 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000043 BA ..        OR        A, S:?b0
+   \   000045 88           PUSH      A
+   \   000046 86           POP       CC
+    711          
+    712                  /**
+    713                   * Note that we don't call the scheduler now as it will be called
+    714                   * when we exit the ISR by atomIntExit().
+    715                   */
+    716              }
+    717          }
+   \                     ??atomMutexTimerCallback_0:
+   \   000047 32 ....      POP       S:?b10
+   \   00004A CC ....      JP        L:?epilogue_w4
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      25  atomMutexCreate
+     177  atomMutexDelete
+     320  atomMutexGet
+     203  atomMutexPut
+      77  atomMutexTimerCallback
+
+ 
+ 802 bytes in section .near_func.text
+ 
+ 802 bytes of CODE memory
+
+Errors: none
+Warnings: 1

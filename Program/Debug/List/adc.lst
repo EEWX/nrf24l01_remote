@@ -1,0 +1,394 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:15
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\User\adc.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\adc.c" -e -Om --no_unroll
+#        --no_inline --no_tbaa --no_cross_call --debug --code_model small
+#        --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\adc.lst
+#    Object file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\adc.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\User\adc.c
+      1          #include "stm8l15x.h"
+      2          #include "adc.h"
+
+   \                                 In section .near.bss, align 1
+      3          uint16_t ADC_Results[ADC_BUFFER_SIZE];
+   \                     ADC_Results:
+   \   000000              DS8 20
+
+   \                                 In section .near.bss, align 1
+      4          uint16_t ADC_ResultsRaw[ADC_BUFFER_SIZE];
+   \                     ADC_ResultsRaw:
+   \   000000              DS8 20
+
+   \                                 In section .near.bss, align 1
+      5          FlagStatus SYSTEM_ADC_UpdateFlag = RESET;
+   \                     SYSTEM_ADC_UpdateFlag:
+   \   000000              DS8 1
+      6          
+
+   \                                 In section .near_func.text, align 1
+      7          void Analog_Init(void)
+      8          {
+      9              //-----------Cross zero comparator configuration------------------
+     10            CLK_PeripheralClockConfig(CLK_Peripheral_ADC1,ENABLE);
+   \                     Analog_Init:
+   \   000000 35 01 ....   MOV       S:?b0, #0x1
+   \   000004 A6 10        LD        A, #0x10
+   \   000006 CD ....      CALL      L:CLK_PeripheralClockConfig
+     11            ADC_VrefintCmd(ENABLE);
+   \   000009 A6 01        LD        A, #0x1
+   \   00000B CD ....      CALL      L:ADC_VrefintCmd
+     12            
+     13            GPIO_Init(LEFT_X_GPIO,LEFT_X_PIN,GPIO_Mode_In_FL_No_IT);
+   \   00000E 3F ..        CLR       S:?b0
+   \   000010 A6 40        LD        A, #0x40
+   \   000012 AE 5000      LDW       X, #0x5000
+   \   000015 CD ....      CALL      L:GPIO_Init
+     14            GPIO_Init(LEFT_Y_GPIO,LEFT_Y_PIN,GPIO_Mode_In_FL_No_IT);
+   \   000018 3F ..        CLR       S:?b0
+   \   00001A A6 20        LD        A, #0x20
+   \   00001C AE 5000      LDW       X, #0x5000
+   \   00001F CD ....      CALL      L:GPIO_Init
+     15            GPIO_Init(RIGHT_X_GPIO,RIGHT_X_PIN,GPIO_Mode_In_FL_No_IT);
+   \   000022 3F ..        CLR       S:?b0
+   \   000024 A6 10        LD        A, #0x10
+   \   000026 AE 5000      LDW       X, #0x5000
+   \   000029 CD ....      CALL      L:GPIO_Init
+     16            GPIO_Init(RIGHT_Y_GPIO,RIGHT_Y_PIN,GPIO_Mode_In_FL_No_IT);
+   \   00002C 3F ..        CLR       S:?b0
+   \   00002E A6 80        LD        A, #0x80
+   \   000030 AE 500A      LDW       X, #0x500a
+   \   000033 CD ....      CALL      L:GPIO_Init
+     17            GPIO_Init(BAT_MON_GPIO,BAT_MON_PIN,GPIO_Mode_In_FL_No_IT);
+   \   000036 3F ..        CLR       S:?b0
+   \   000038 A6 10        LD        A, #0x10
+   \   00003A AE 500A      LDW       X, #0x500a
+   \   00003D CD ....      CALL      L:GPIO_Init
+     18            GPIO_Init(POT_A_GPIO,POT_A_PIN,GPIO_Mode_In_FL_No_IT);
+   \   000040 3F ..        CLR       S:?b0
+   \   000042 A6 08        LD        A, #0x8
+   \   000044 AE 500F      LDW       X, #0x500f
+   \   000047 CD ....      CALL      L:GPIO_Init
+     19            GPIO_Init(POT_B_GPIO,POT_B_PIN,GPIO_Mode_In_FL_No_IT);
+   \   00004A 3F ..        CLR       S:?b0
+   \   00004C A6 04        LD        A, #0x4
+   \   00004E AE 500F      LDW       X, #0x500f
+   \   000051 CD ....      CALL      L:GPIO_Init
+     20            GPIO_Init(POT_C_GPIO,POT_C_PIN,GPIO_Mode_In_FL_No_IT);
+   \   000054 3F ..        CLR       S:?b0
+   \   000056 A6 02        LD        A, #0x2
+   \   000058 AE 500F      LDW       X, #0x500f
+   \   00005B CD ....      CALL      L:GPIO_Init
+     21            GPIO_Init(POT_D_GPIO,POT_D_PIN,GPIO_Mode_In_FL_No_IT);
+   \   00005E 3F ..        CLR       S:?b0
+   \   000060 A6 10        LD        A, #0x10
+   \   000062 AE 500F      LDW       X, #0x500f
+   \   000065 CD ....      CALL      L:GPIO_Init
+     22            // ADC_VrefintCmd(ENABLE);
+     23            ADC_Init(ADC1,ADC_ConversionMode_Single,ADC_Resolution_12Bit,ADC_Prescaler_2);
+   \   000068 35 80 ....   MOV       S:?b1, #0x80
+   \   00006C 3F ..        CLR       S:?b0
+   \   00006E 4F           CLR       A
+   \   00006F AE 5340      LDW       X, #0x5340
+   \   000072 CD ....      CALL      L:ADC_Init
+     24            ADC_SamplingTimeConfig(ADC1,ADC_Group_FastChannels,ADC_SamplingTime_48Cycles);
+   \   000075 35 04 ....   MOV       S:?b0, #0x4
+   \   000079 A6 01        LD        A, #0x1
+   \   00007B AE 5340      LDW       X, #0x5340
+   \   00007E CD ....      CALL      L:ADC_SamplingTimeConfig
+     25            ADC_DMACmd(ADC1,ENABLE);
+   \   000081 A6 01        LD        A, #0x1
+   \   000083 AE 5340      LDW       X, #0x5340
+   \   000086 CD ....      CALL      L:ADC_DMACmd
+     26            ADC_Cmd(ADC1,ENABLE);
+   \   000089 A6 01        LD        A, #0x1
+   \   00008B AE 5340      LDW       X, #0x5340
+   \   00008E CD ....      CALL      L:ADC_Cmd
+     27            
+     28            //--------!!!!!!channel selection must be done after enable the ADC, refer to manual page 209------------------------
+     29            ADC_ChannelCmd(ADC1,ADC_Channel_Vrefint,ENABLE);      //REF 1.21V
+   \   000091 A6 01        LD        A, #0x1
+   \   000093 90AE 0010    LDW       Y, #0x10
+   \   000097 AE 5340      LDW       X, #0x5340
+   \   00009A CD ....      CALL      L:ADC_ChannelCmd
+     30            ADC_ChannelCmd(ADC1,ADC_Channel_0,ENABLE);          //Left X
+   \   00009D A6 01        LD        A, #0x1
+   \   00009F 90AE 0301    LDW       Y, #0x301
+   \   0000A3 AE 5340      LDW       X, #0x5340
+   \   0000A6 CD ....      CALL      L:ADC_ChannelCmd
+     31            ADC_ChannelCmd(ADC1,ADC_Channel_1,ENABLE);         //Left Y
+   \   0000A9 A6 01        LD        A, #0x1
+   \   0000AB 90AE 0302    LDW       Y, #0x302
+   \   0000AF AE 5340      LDW       X, #0x5340
+   \   0000B2 CD ....      CALL      L:ADC_ChannelCmd
+     32            ADC_ChannelCmd(ADC1,ADC_Channel_2,ENABLE);         //RIGHT X
+   \   0000B5 A6 01        LD        A, #0x1
+   \   0000B7 90AE 0304    LDW       Y, #0x304
+   \   0000BB AE 5340      LDW       X, #0x5340
+   \   0000BE CD ....      CALL      L:ADC_ChannelCmd
+     33            ADC_ChannelCmd(ADC1,ADC_Channel_3,ENABLE);         //RIGHT Y
+   \   0000C1 A6 01        LD        A, #0x1
+   \   0000C3 90AE 0308    LDW       Y, #0x308
+   \   0000C7 AE 5340      LDW       X, #0x5340
+   \   0000CA CD ....      CALL      L:ADC_ChannelCmd
+     34            ADC_ChannelCmd(ADC1,ADC_Channel_4,ENABLE);         //Battery monitor
+   \   0000CD A6 01        LD        A, #0x1
+   \   0000CF 90AE 0310    LDW       Y, #0x310
+   \   0000D3 AE 5340      LDW       X, #0x5340
+   \   0000D6 CD ....      CALL      L:ADC_ChannelCmd
+     35            ADC_ChannelCmd(ADC1,ADC_Channel_10,ENABLE);         //POT D
+   \   0000D9 A6 01        LD        A, #0x1
+   \   0000DB 90AE 0204    LDW       Y, #0x204
+   \   0000DF AE 5340      LDW       X, #0x5340
+   \   0000E2 CD ....      CALL      L:ADC_ChannelCmd
+     36            ADC_ChannelCmd(ADC1,ADC_Channel_19,ENABLE);         //POT A
+   \   0000E5 A6 01        LD        A, #0x1
+   \   0000E7 90AE 0108    LDW       Y, #0x108
+   \   0000EB AE 5340      LDW       X, #0x5340
+   \   0000EE CD ....      CALL      L:ADC_ChannelCmd
+     37            ADC_ChannelCmd(ADC1,ADC_Channel_20,ENABLE);         //POT B
+   \   0000F1 A6 01        LD        A, #0x1
+   \   0000F3 90AE 0110    LDW       Y, #0x110
+   \   0000F7 AE 5340      LDW       X, #0x5340
+   \   0000FA CD ....      CALL      L:ADC_ChannelCmd
+     38            ADC_ChannelCmd(ADC1,ADC_Channel_21,ENABLE);         //POT C
+   \   0000FD A6 01        LD        A, #0x1
+   \   0000FF 90AE 0120    LDW       Y, #0x120
+   \   000103 AE 5340      LDW       X, #0x5340
+   \   000106 CD ....      CALL      L:ADC_ChannelCmd
+     39            
+     40            //-----------Use timer2 to triger the ADC, also used as LCD PWM------------------------
+     41            TIM2_DeInit();
+   \   000109 CD ....      CALL      L:TIM2_DeInit
+     42            CLK_PeripheralClockConfig(CLK_Peripheral_TIM2,ENABLE);
+   \   00010C 35 01 ....   MOV       S:?b0, #0x1
+   \   000110 4F           CLR       A
+   \   000111 CD ....      CALL      L:CLK_PeripheralClockConfig
+     43            TIM2_TimeBaseInit(TIM2_Prescaler_1,TIM2_CounterMode_Up,16000);//1000Hz TIM2_Cmd(ENABLE);
+   \   000114 AE 3E80      LDW       X, #0x3e80
+   \   000117 3F ..        CLR       S:?b0
+   \   000119 4F           CLR       A
+   \   00011A CD ....      CALL      L:TIM2_TimeBaseInit
+     44            TIM2_ITConfig(TIM2_IT_Update,ENABLE);
+   \   00011D 35 01 ....   MOV       S:?b0, #0x1
+   \   000121 A6 01        LD        A, #0x1
+   \   000123 CD ....      CALL      L:TIM2_ITConfig
+     45            TIM2_OC1Init(TIM2_OCMode_PWM1,TIM2_OutputState_Enable,8000,TIM2_OCPolarity_High,TIM2_OCIdleState_Reset);
+   \   000126 3F ..        CLR       S:?b2
+   \   000128 3F ..        CLR       S:?b1
+   \   00012A AE 1F40      LDW       X, #0x1f40
+   \   00012D 35 01 ....   MOV       S:?b0, #0x1
+   \   000131 A6 60        LD        A, #0x60
+   \   000133 CD ....      CALL      L:TIM2_OC1Init
+     46            TIM2_CCxCmd(TIM2_Channel_1,ENABLE);
+   \   000136 35 01 ....   MOV       S:?b0, #0x1
+   \   00013A 4F           CLR       A
+   \   00013B CD ....      CALL      L:TIM2_CCxCmd
+     47            TIM2_CtrlPWMOutputs(ENABLE);
+   \   00013E A6 01        LD        A, #0x1
+   \   000140 CD ....      CALL      L:TIM2_CtrlPWMOutputs
+     48            TIM2_Cmd(ENABLE);
+   \   000143 A6 01        LD        A, #0x1
+   \   000145 CD ....      CALL      L:TIM2_Cmd
+     49            
+     50            CLK_PeripheralClockConfig(CLK_Peripheral_DMA1,ENABLE);
+   \   000148 35 01 ....   MOV       S:?b0, #0x1
+   \   00014C A6 14        LD        A, #0x14
+   \   00014E CD ....      CALL      L:CLK_PeripheralClockConfig
+     51            DMA_Init(DMA1_Channel0,(uint32_t)ADC_ResultsRaw,ADC1_BASE+0x04,ADC_BUFFER_SIZE,DMA_DIR_PeripheralToMemory,DMA_Mode_Circular,DMA_MemoryIncMode_Inc,DMA_Priority_High,DMA_MemoryDataSize_HalfWord);
+   \   000151 4B 08        PUSH      #0x8
+   \   000153 35 20 ....   MOV       S:?b7, #0x20
+   \   000157 35 20 ....   MOV       S:?b6, #0x20
+   \   00015B 35 10 ....   MOV       S:?b5, #0x10
+   \   00015F 3F ..        CLR       S:?b4
+   \   000161 A6 0A        LD        A, #0xa
+   \   000163 90AE 5344    LDW       Y, #0x5344
+   \   000167 AE ....      LDW       X, #ADC_ResultsRaw
+   \   00016A BF ..        LDW       S:?w1, X
+   \   00016C 5F           CLRW      X
+   \   00016D BF ..        LDW       S:?w0, X
+   \   00016F AE 5075      LDW       X, #0x5075
+   \   000172 CD ....      CALL      L:DMA_Init
+   \   000175 5B 01        ADD       SP, #0x1
+     52            DMA_ITConfig(DMA1_Channel0,DMA_ITx_TC,ENABLE);
+   \   000177 35 01 ....   MOV       S:?b0, #0x1
+   \   00017B A6 02        LD        A, #0x2
+   \   00017D AE 5075      LDW       X, #0x5075
+   \   000180 CD ....      CALL      L:DMA_ITConfig
+     53            DMA_Cmd(DMA1_Channel0,ENABLE);
+   \   000183 A6 01        LD        A, #0x1
+   \   000185 AE 5075      LDW       X, #0x5075
+   \   000188 CD ....      CALL      L:DMA_Cmd
+     54            DMA_GlobalCmd(ENABLE);
+   \   00018B A6 01        LD        A, #0x1
+   \   00018D CC ....      JP        L:DMA_GlobalCmd
+     55          }
+     56          
+     57          //Timer2 triger ADC in every 1ms
+
+   \                                 In section .near_func.text, align 1
+     58          void TIM2_Update_ISR(void)
+     59          {
+     60            ADC_SoftwareStartConv(ADC1);
+   \                     TIM2_Update_ISR:
+   \   000000 AE 5340      LDW       X, #0x5340
+   \   000003 CC ....      JP        L:ADC_SoftwareStartConv
+     61          }
+     62          
+
+   \                                 In section .near_func.text, align 1
+     63          void SYSTEM_VariablesUpdate(void)
+     64          {
+     65            if(SYSTEM_ADC_UpdateFlag)
+   \                     SYSTEM_VariablesUpdate:
+   \   000000 C6 ....      LD        A, L:SYSTEM_ADC_UpdateFlag
+   \   000003 27 04        JREQ      L:??SYSTEM_VariablesUpdate_0
+     66            {
+     67              SYSTEM_ADC_UpdateFlag = RESET;
+   \   000005 725F ....    CLR       L:SYSTEM_ADC_UpdateFlag
+     68              
+     69             
+     70            }
+     71           
+     72          }
+   \                     ??SYSTEM_VariablesUpdate_0:
+   \   000009 81           RET
+     73          
+     74          
+
+   \                                 In section .near_func.text, align 1
+     75          void SYSTEM_ADC_DMA_ISR(void)
+     76          {
+   \                     SYSTEM_ADC_DMA_ISR:
+   \   000000 CD ....      CALL      L:?push_l2
+     77            static uint32_t temp_sum[ADC_BUFFER_SIZE];
+     78            static uint8_t sum_count = 0;
+     79            uint8_t cnt = 0;
+   \   000003 3F ..        CLR       S:?b9
+     80            for(cnt = 0;cnt<ADC_BUFFER_SIZE;cnt++)
+   \   000005 20 22        JRA       L:??SYSTEM_ADC_DMA_ISR_0
+     81            {
+     82              temp_sum[cnt] += ADC_ResultsRaw[cnt];
+   \                     ??SYSTEM_ADC_DMA_ISR_1:
+   \   000007 3F ..        CLR       S:?b8
+   \   000009 BE ..        LDW       X, S:?w4
+   \   00000B 58           SLLW      X
+   \   00000C 58           SLLW      X
+   \   00000D 1C ....      ADDW      X, #??temp_sum
+   \   000010 9093         LDW       Y, X
+   \   000012 BE ..        LDW       X, S:?w4
+   \   000014 58           SLLW      X
+   \   000015 DE ....      LDW       X, (L:ADC_ResultsRaw,X)
+   \   000018 BF ..        LDW       S:?w1, X
+   \   00001A 5F           CLRW      X
+   \   00001B BF ..        LDW       S:?w0, X
+   \   00001D 93           LDW       X, Y
+   \   00001E CD ....      CALL      L:?add32_l0_l0_0x
+   \   000021 CD ....      CALL      L:?load32_0x_l0
+     83            }
+   \   000024 B6 ..        LD        A, S:?b9
+   \   000026 4C           INC       A
+   \   000027 B7 ..        LD        S:?b9, A
+   \                     ??SYSTEM_ADC_DMA_ISR_0:
+   \   000029 B6 ..        LD        A, S:?b9
+   \   00002B A1 0A        CP        A, #0xa
+   \   00002D 25 D8        JRC       L:??SYSTEM_ADC_DMA_ISR_1
+     84            sum_count++;
+   \   00002F A6 01        LD        A, #0x1
+   \   000031 CB ....      ADD       A, L:??sum_count
+   \   000034 C7 ....      LD        L:??sum_count, A
+     85            
+     86            if(sum_count == ADC_AVERAGE_NUMBER)
+   \   000037 A6 0A        LD        A, #0xa
+   \   000039 C1 ....      CP        A, L:??sum_count
+   \   00003C 26 3F        JRNE      L:??SYSTEM_ADC_DMA_ISR_2
+     87            {
+     88              sum_count = 0;
+   \   00003E 725F ....    CLR       L:??sum_count
+     89              for(cnt = 0;cnt<ADC_BUFFER_SIZE;cnt++)
+   \   000042 3F ..        CLR       S:?b9
+   \   000044 20 2D        JRA       L:??SYSTEM_ADC_DMA_ISR_3
+     90              {
+     91                ADC_Results[cnt] = temp_sum[cnt]/ADC_AVERAGE_NUMBER;
+   \                     ??SYSTEM_ADC_DMA_ISR_4:
+   \   000046 3F ..        CLR       S:?b8
+   \   000048 BE ..        LDW       X, S:?w4
+   \   00004A 58           SLLW      X
+   \   00004B 58           SLLW      X
+   \   00004C 1C ....      ADDW      X, #??temp_sum
+   \   00004F BF ..        LDW       S:?w5, X
+   \   000051 CD ....      CALL      L:?load32_l0_0x
+   \   000054 CD ....      CALL      L:?udiv32_l0_l0_dl
+   \   000057 0000000A     DC32      0xa
+   \   00005B 90BE ..      LDW       Y, S:?w1
+   \   00005E BE ..        LDW       X, S:?w4
+   \   000060 58           SLLW      X
+   \   000061 DF ....      LDW       (L:ADC_Results,X), Y
+     92                temp_sum[cnt] = 0;
+   \   000064 5F           CLRW      X
+   \   000065 BF ..        LDW       S:?w1, X
+   \   000067 BF ..        LDW       S:?w0, X
+   \   000069 BE ..        LDW       X, S:?w5
+   \   00006B CD ....      CALL      L:?load32_0x_l0
+     93              }   
+   \   00006E B6 ..        LD        A, S:?b9
+   \   000070 4C           INC       A
+   \   000071 B7 ..        LD        S:?b9, A
+   \                     ??SYSTEM_ADC_DMA_ISR_3:
+   \   000073 B6 ..        LD        A, S:?b9
+   \   000075 A1 0A        CP        A, #0xa
+   \   000077 25 CD        JRC       L:??SYSTEM_ADC_DMA_ISR_4
+     94              SYSTEM_ADC_UpdateFlag = SET;
+   \   000079 35 01 ....   MOV       L:SYSTEM_ADC_UpdateFlag, #0x1
+     95            }
+     96          }
+   \                     ??SYSTEM_ADC_DMA_ISR_2:
+   \   00007D CC ....      JP        L:?epilogue_l2
+
+   \                                 In section .near.bss, align 1
+   \                     ??temp_sum:
+   \   000000              DS8 40
+
+   \                                 In section .near.bss, align 1
+   \                     ??sum_count:
+   \   000000              DS8 1
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      20  ADC_Results
+      20  ADC_ResultsRaw
+     400  Analog_Init
+     128  SYSTEM_ADC_DMA_ISR
+       1  SYSTEM_ADC_UpdateFlag
+      10  SYSTEM_VariablesUpdate
+       6  TIM2_Update_ISR
+       1  sum_count
+      40  temp_sum
+
+ 
+  82 bytes in section .near.bss
+ 544 bytes in section .near_func.text
+ 
+ 544 bytes of CODE memory
+  82 bytes of DATA memory
+
+Errors: none
+Warnings: none

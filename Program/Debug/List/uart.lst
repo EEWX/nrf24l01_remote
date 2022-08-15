@@ -1,0 +1,325 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:18
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\uart.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\uart.c"
+#        -e -Om --no_unroll --no_inline --no_tbaa --no_cross_call --debug
+#        --code_model small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\uart.lst
+#    Object file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\uart.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\uart.c
+      1          #include <stdio.h>
+      2          
+      3          #include "stm8l15x.h"
+      4          
+      5          #include "atom.h"
+      6          #include "atommutex.h"
+      7          #include "stm8l15x_usart.h"
+      8          #include "uart.h"
+      9          
+     10          
+     11          /*
+     12           * Semaphore for single-threaded access to UART device
+     13           */
+
+   \                                 In section .near.bss, align 1
+     14          static ATOM_MUTEX uart_mutex;
+   \                     uart_mutex:
+   \   000000              DS8 5
+     15          
+     16          
+     17          /*
+     18           * Initialize the UART to requested baudrate, tx/rx, 8N1.
+     19           */
+
+   \                                 In section .near_func.text, align 1
+     20          int uart_init(uint32_t baudrate)
+     21          {
+   \                     uart_init:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?mov_l2_l0
+     22            int status;
+     23            GPIO_Init(GPIOC, GPIO_Pin_3, GPIO_Mode_Out_PP_High_Fast);
+   \   000006 35 F0 ....   MOV       S:?b0, #0xf0
+   \   00000A A6 08        LD        A, #0x8
+   \   00000C AE 500A      LDW       X, #0x500a
+   \   00000F CD ....      CALL      L:GPIO_Init
+     24            GPIO_Init(GPIOC, GPIO_Pin_2, GPIO_Mode_In_PU_No_IT);
+   \   000012 35 40 ....   MOV       S:?b0, #0x40
+   \   000016 A6 04        LD        A, #0x4
+   \   000018 AE 500A      LDW       X, #0x500a
+   \   00001B CD ....      CALL      L:GPIO_Init
+     25            /**
+     26             * Set up UART2 for putting out debug messages.
+     27             * This the UART used on STM8S Discovery, change if required.
+     28             */
+     29            CLK_PeripheralClockConfig(CLK_Peripheral_USART1,ENABLE);
+   \   00001E 35 01 ....   MOV       S:?b0, #0x1
+   \   000022 A6 05        LD        A, #0x5
+   \   000024 CD ....      CALL      L:CLK_PeripheralClockConfig
+     30            USART_DeInit(USART1);
+   \   000027 AE 5230      LDW       X, #0x5230
+   \   00002A CD ....      CALL      L:USART_DeInit
+     31            USART_Init(USART1,baudrate, USART_WordLength_8b, USART_StopBits_1, USART_Parity_No,
+     32                        USART_Mode_Rx|USART_Mode_Tx);
+   \   00002D 35 0C ....   MOV       S:?b6, #0xc
+   \   000031 3F ..        CLR       S:?b5
+   \   000033 3F ..        CLR       S:?b4
+   \   000035 4F           CLR       A
+   \   000036 CD ....      CALL      L:?mov_l0_l2
+   \   000039 AE 5230      LDW       X, #0x5230
+   \   00003C CD ....      CALL      L:USART_Init
+     33          
+     34            /* Create a mutex for single-threaded putchar() access */
+     35            if (atomMutexCreate (&uart_mutex) != ATOM_OK)
+   \   00003F AE ....      LDW       X, #uart_mutex
+   \   000042 CD ....      CALL      L:atomMutexCreate
+   \   000045 A1 00        CP        A, #0x0
+   \   000047 27 05        JREQ      L:??uart_init_0
+     36            {
+     37              status = -1;
+   \   000049 5F           CLRW      X
+   \   00004A 5A           DECW      X
+   \   00004B CC ....      JP        L:?epilogue_l2
+     38            }
+     39            else
+     40            {
+     41              status = 0;
+   \                     ??uart_init_0:
+   \   00004E 5F           CLRW      X
+     42            }
+     43          
+     44            /* Finished */
+     45            return (status);
+   \   00004F CC ....      JP        L:?epilogue_l2
+     46          }
+     47          
+     48          
+     49          /**
+     50           * \b uart_putchar
+     51           *
+     52           * Write a char out via UART2
+     53           *
+     54           * @param[in] c Character to send
+     55           *
+     56           * @return Character sent
+     57           */
+
+   \                                 In section .near_func.text, align 1
+     58          char uart_putchar (char c)
+     59          {
+   \                     uart_putchar:
+   \   000000 3B ....      PUSH      S:?b8
+   \   000003 B7 ..        LD        S:?b8, A
+     60              /* Block on private access to the UART */
+     61              if (atomMutexGet(&uart_mutex, 0) == ATOM_OK)
+   \   000005 5F           CLRW      X
+   \   000006 BF ..        LDW       S:?w1, X
+   \   000008 BF ..        LDW       S:?w0, X
+   \   00000A AE ....      LDW       X, #uart_mutex
+   \   00000D CD ....      CALL      L:atomMutexGet
+   \   000010 A1 00        CP        A, #0x0
+   \   000012 26 28        JRNE      L:??uart_putchar_0
+     62              {
+     63                  /* Convert \n to \r\n */
+     64                  if (c == '\n')
+   \   000014 B6 ..        LD        A, S:?b8
+   \   000016 A1 0A        CP        A, #0xa
+   \   000018 26 06        JRNE      L:??uart_putchar_1
+     65                      putchar('\r');
+   \   00001A AE 000D      LDW       X, #0xd
+   \   00001D CD ....      CALL      L:putchar
+     66          
+     67                  /* Write a character to the UART2 */
+     68                  USART_SendData8(USART1,c);
+   \                     ??uart_putchar_1:
+   \   000020 B6 ..        LD        A, S:?b8
+   \   000022 AE 5230      LDW       X, #0x5230
+   \   000025 CD ....      CALL      L:USART_SendData8
+     69                
+     70                  /* Loop until the end of transmission */
+     71                  while (USART_GetFlagStatus(USART1,USART_FLAG_TXE) == RESET)
+   \                     ??uart_putchar_2:
+   \   000028 90AE 0080    LDW       Y, #0x80
+   \   00002C AE 5230      LDW       X, #0x5230
+   \   00002F CD ....      CALL      L:USART_GetFlagStatus
+   \   000032 A1 00        CP        A, #0x0
+   \   000034 27 F2        JREQ      L:??uart_putchar_2
+     72                      ;
+     73          
+     74                  /* Return mutex access */
+     75                  atomMutexPut(&uart_mutex);
+   \   000036 AE ....      LDW       X, #uart_mutex
+   \   000039 CD ....      CALL      L:atomMutexPut
+     76          
+     77              }
+     78          
+     79              return (c);
+   \                     ??uart_putchar_0:
+   \   00003C B6 ..        LD        A, S:?b8
+   \   00003E 32 ....      POP       S:?b8
+   \   000041 81           RET
+     80          }
+     81          
+     82          
+     83          /* COSMIC: Requires putchar() routine to override stdio */
+     84          #if defined(__CSMC__)
+     85          /**
+     86           * \b putchar
+     87           *
+     88           * Retarget putchar() to use UART2
+     89           *
+     90           * @param[in] c Character to send
+     91           *
+     92           * @return Character sent
+     93           */
+     94          char putchar (char c)
+     95          {
+     96              return (uart_putchar(c));
+     97          }
+     98          #endif /* __CSMC__ */
+     99          
+    100          
+    101          /* RAISONANCE: Requires putchar() routine to override stdio */
+    102          #if defined(__RCSTM8__)
+    103          /**
+    104           * \b putchar
+    105           *
+    106           * Retarget putchar() to use UART2
+    107           *
+    108           * @param[in] c Character to send
+    109           *
+    110           * @return 1 on success
+    111           */
+    112          int putchar (char c)
+    113          {
+    114              uart_putchar(c);
+    115              return (1);
+    116          }
+    117          #endif /* __RCSTM8__ */
+    118          
+    119          
+    120          /* IAR: Requires __write() routine to override stdio */
+    121          #if defined(__IAR_SYSTEMS_ICC__)
+    122          /**
+    123           * \b __write
+    124           *
+    125           * Override for IAR stream output
+    126           *
+    127           * @param[in] handle Stdio handle. -1 to flush.
+    128           * @param[in] buf Pointer to buffer to be written
+    129           * @param[in] bufSize Number of characters to be written
+    130           *
+    131           * @return Number of characters sent
+    132           */
+
+   \                                 In section .near_func.text, align 1
+    133          size_t __write(int handle, const unsigned char *buf, size_t bufSize)
+    134          {
+   \                     __write:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w6
+   \   000006 90BF ..      LDW       S:?w6, Y
+   \   000009 CD ....      CALL      L:?mov_w5_w0
+    135              size_t chars_written = 0;
+   \   00000C 3F ..        CLR       S:?b9
+   \   00000E 3F ..        CLR       S:?b8
+    136              
+    137              /* Ignore flushes */
+    138              if (handle == -1)
+   \   000010 A3 FFFF      CPW       X, #0xffffffffffffffff
+   \   000013 27 23        JREQ      L:??__write_0
+    139              {
+    140                chars_written = (size_t)0; 
+    141              }
+    142              /* Only allow stdout/stderr output */
+    143              else if ((handle != 1) && (handle != 2))
+   \   000015 A3 0001      CPW       X, #0x1
+   \   000018 27 18        JREQ      L:??__write_1
+   \   00001A A3 0002      CPW       X, #0x2
+   \   00001D 27 13        JREQ      L:??__write_1
+    144              {
+    145                chars_written = (size_t)-1; 
+   \   00001F 5F           CLRW      X
+   \   000020 5A           DECW      X
+   \   000021 BF ..        LDW       S:?w4, X
+   \   000023 20 13        JRA       L:??__write_0
+    146              }
+    147              /* Parameters OK, call the low-level character output routine */
+    148              else
+    149              {
+    150                  while (chars_written < bufSize)
+    151                  {
+    152                      uart_putchar (buf[chars_written]);
+   \                     ??__write_2:
+   \   000025 72BB ....    ADDW      X, S:?w6
+   \   000029 F6           LD        A, (X)
+   \   00002A CD ....      CALL      L:uart_putchar
+    153                      chars_written++;
+   \   00002D BE ..        LDW       X, S:?w4
+   \   00002F 5C           INCW      X
+   \   000030 BF ..        LDW       S:?w4, X
+    154                  }
+   \                     ??__write_1:
+   \   000032 BE ..        LDW       X, S:?w4
+   \   000034 B3 ..        CPW       X, S:?w5
+   \   000036 25 ED        JRC       L:??__write_2
+    155              }
+    156              
+    157              return (chars_written);
+   \                     ??__write_0:
+   \   000038 BE ..        LDW       X, S:?w4
+   \   00003A CC ....      JP        L:?epilogue_l2_w6
+    158          }
+    159          #endif /* __IAR_SYSTEMS_ICC__ */
+    160          
+    161          #if defined(__SDCC_stm8)
+    162          #if __SDCC_REVISION >= 9624
+    163          int putchar (int c)
+    164          {
+    165              return(uart_putchar(c));
+    166          }
+    167          #else
+    168          void putchar (char c)
+    169          {
+    170              uart_putchar(c);
+    171          }
+    172          #endif
+    173          
+    174          #endif
+    175          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      61  __write
+      82  uart_init
+       5  uart_mutex
+      66  uart_putchar
+
+ 
+   5 bytes in section .near.bss
+ 209 bytes in section .near_func.text
+ 
+ 209 bytes of CODE memory
+   5 bytes of DATA memory
+
+Errors: none
+Warnings: 2

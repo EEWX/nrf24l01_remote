@@ -1,0 +1,1771 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:16
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomqueue.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomqueue.c"
+#        -e -Om --no_unroll --no_inline --no_tbaa --no_cross_call --debug
+#        --code_model small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\atomqueue.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\atomqueue.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomqueue.c
+      1          /*
+      2           * Copyright (c) 2010, Kelvin Lawson. All rights reserved.
+      3           *
+      4           * Redistribution and use in source and binary forms, with or without
+      5           * modification, are permitted provided that the following conditions
+      6           * are met:
+      7           *
+      8           * 1. Redistributions of source code must retain the above copyright
+      9           *    notice, this list of conditions and the following disclaimer.
+     10           * 2. Redistributions in binary form must reproduce the above copyright
+     11           *    notice, this list of conditions and the following disclaimer in the
+     12           *    documentation and/or other materials provided with the distribution.
+     13           * 3. No personal names or organizations' names associated with the
+     14           *    Atomthreads project may be used to endorse or promote products
+     15           *    derived from this software without specific prior written permission.
+     16           *
+     17           * THIS SOFTWARE IS PROVIDED BY THE ATOMTHREADS PROJECT AND CONTRIBUTORS
+     18           * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+     19           * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     20           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE
+     21           * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     22           * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     23           * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     24           * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     25           * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     26           * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     27           * POSSIBILITY OF SUCH DAMAGE.
+     28           */
+     29          
+     30          
+     31          /** 
+     32           * \file
+     33           * Queue library.
+     34           *
+     35           *
+     36           * This module implements a queue / message-passing library with the following
+     37           * features:
+     38           *
+     39           * \par Flexible blocking APIs
+     40           * Threads which wish to make a call which may block can choose whether to
+     41           * block, block with timeout, or not block and return a relevent status
+     42           * code.
+     43           *
+     44           * \par Interrupt-safe calls
+     45           * All APIs can be called from interrupt context. Any calls which could
+     46           * potentially block have optional parameters to prevent blocking if you
+     47           * wish to call them from interrupt context. Any attempt to make a call
+     48           * which would block from interrupt context will be automatically and
+     49           * safely prevented.
+     50           *
+     51           * \par Priority-based queueing
+     52           * Where multiple threads are blocking on a queue, they are woken in order of
+     53           * the threads' priorities. Where multiple threads of the same priority are
+     54           * blocking, they are woken in FIFO order.
+     55           *
+     56           * \par Configurable queue sizes
+     57           * Queues can be created with any sized message, and any number of stored
+     58           * messages.
+     59           *
+     60           * \par Smart queue deletion
+     61           * Where a queue is deleted while threads are blocking on it, all blocking
+     62           * threads are woken and returned a status code to indicate the reason for
+     63           * being woken.
+     64           *
+     65           *
+     66           * \n <b> Usage instructions: </b> \n
+     67           *
+     68           * All queue objects must be initialised before use by calling
+     69           * atomQueueCreate(). Once initialised atomQueueGet() and atomQueuePut() are
+     70           * used to send and receive messages via the queue respectively.
+     71           *
+     72           * Messages can be added to a queue by calling atomQueuePut(). If the queue is
+     73           * full the caller will block until space becomes available (by a message
+     74           * being removed from the queue). Optionally a non-blocking call can be made
+     75           * in which case the call will return with a status code indicating that the
+     76           * queue is full. This allows messages to be posted from interrupt handlers
+     77           * or threads which you do not wish to block, providing it is not fatal that
+     78           * the call could fail if the queue was full.
+     79           *
+     80           * Messages can be received from the queue by calling atomQueueGet(). This
+     81           * will return the first message available in the queue in FIFO order. If
+     82           * the queue is empty then the call will block. Optionally, a non-blocking
+     83           * call can be made in which case the call will return with a status code
+     84           * indicating that the queue is full. This allows messages to be received
+     85           * by interrupt handlers or threads which you do not wish to block.
+     86           * 
+     87           * A queue which is no longer required can be deleted using atomQueueDelete().
+     88           * This function automatically wakes up any threads which are waiting on the
+     89           * deleted queue.
+     90           *
+     91           */
+     92           
+     93          
+     94          #include <string.h>
+     95          
+     96          #include "atom.h"
+     97          #include "atomqueue.h"
+     98          #include "atomtimer.h"
+     99          
+    100          
+    101          /* Local data types */
+    102          
+    103          typedef struct queue_timer
+    104          {
+    105              ATOM_TCB   *tcb_ptr;    /* Thread which is suspended with timeout */
+    106              ATOM_QUEUE *queue_ptr;  /* Queue the thread is interested in */
+    107              ATOM_TCB   **suspQ;     /* TCB queue which thread is suspended on */
+    108          } QUEUE_TIMER;
+    109          
+    110          
+    111          /* Forward declarations */
+    112          
+    113          static uint8_t queue_remove (ATOM_QUEUE *qptr, uint8_t* msgptr);
+    114          static uint8_t queue_insert (ATOM_QUEUE *qptr, uint8_t* msgptr);
+    115          static void atomQueueTimerCallback (POINTER cb_data);
+    116          
+    117          
+    118          /**
+    119           * \b atomQueueCreate
+    120           *
+    121           * Initialises a queue object.
+    122           *
+    123           * Must be called before calling any other queue library routines on a
+    124           * queue. Objects can be deleted later using atomQueueDelete().
+    125           *
+    126           * Does not allocate storage, the caller provides the queue object.
+    127           *
+    128           * Callers pass in their own buffer area for storing the queue messages while
+    129           * in transit between threads. The provided storage must be large enough to
+    130           * store (\c unit_size * \c max_num_mgs) bytes. i.e. the storage area will be
+    131           * used for up to \c max_num_msgs messages each of size \c unit_size.
+    132           *
+    133           * Queues use a fixed-size message.
+    134           *
+    135           * This function can be called from interrupt context.
+    136           *
+    137           * @param[in] qptr Pointer to queue object
+    138           * @param[in] buff_ptr Pointer to buffer storage area
+    139           * @param[in] unit_size Size in bytes of each queue message
+    140           * @param[in] max_num_msgs Maximum number of messages in the queue
+    141           *
+    142           * @retval ATOM_OK Success
+    143           * @retval ATOM_ERR_PARAM Bad parameters
+    144           */
+
+   \                                 In section .near_func.text, align 1
+    145          uint8_t atomQueueCreate (ATOM_QUEUE *qptr, uint8_t *buff_ptr, uint32_t unit_size, uint32_t max_num_msgs)
+    146          {
+   \                     atomQueueCreate:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 BF ..        LDW       S:?w4, X
+    147              uint8_t status;
+    148          
+    149              /* Parameter check */
+    150              if ((qptr == NULL) || (buff_ptr == NULL))
+   \   000005 27 14        JREQ      L:??atomQueueCreate_0
+   \   000007 905D         TNZW      Y
+   \   000009 27 10        JREQ      L:??atomQueueCreate_0
+    151              {
+    152                  /* Bad pointers */
+    153                  status = ATOM_ERR_PARAM;
+    154              }
+    155              else if ((unit_size == 0) || (max_num_msgs == 0))
+   \   00000B BE ..        LDW       X, S:?w0
+   \   00000D 26 02        JRNE      L:??atomQueueCreate_1
+   \   00000F BE ..        LDW       X, S:?w1
+   \                     ??atomQueueCreate_1:
+   \   000011 27 08        JREQ      L:??atomQueueCreate_0
+   \   000013 BE ..        LDW       X, S:?w2
+   \   000015 26 02        JRNE      L:??atomQueueCreate_2
+   \   000017 BE ..        LDW       X, S:?w3
+   \                     ??atomQueueCreate_2:
+   \   000019 26 05        JRNE      L:??atomQueueCreate_3
+    156              {
+    157                  /* Bad values */
+    158                  status = ATOM_ERR_PARAM;
+   \                     ??atomQueueCreate_0:
+   \   00001B A6 C9        LD        A, #0xc9
+   \   00001D CC ....      JP        L:?epilogue_w4
+    159              }
+    160              else
+    161              {
+    162                 /* Store the queue details */
+    163                  qptr->buff_ptr = buff_ptr;
+   \                     ??atomQueueCreate_3:
+   \   000020 93           LDW       X, Y
+   \   000021 90BE ..      LDW       Y, S:?w4
+   \   000024 72A9 0004    ADDW      Y, #0x4
+   \   000028 90FF         LDW       (Y), X
+    164                  qptr->unit_size = unit_size;
+   \   00002A BE ..        LDW       X, S:?w4
+   \   00002C 1C 0006      ADDW      X, #0x6
+   \   00002F CD ....      CALL      L:?load32_0x_l0
+    165                  qptr->max_num_msgs = max_num_msgs;
+   \   000032 BE ..        LDW       X, S:?w4
+   \   000034 1C 000A      ADDW      X, #0xa
+   \   000037 CD ....      CALL      L:?load32_0x_l1
+    166          
+    167                  /* Initialise the suspended threads queues */
+    168                  qptr->putSuspQ = NULL;
+   \   00003A 5F           CLRW      X
+   \   00003B 92CF ..      LDW       [S:?w4.w], X
+    169                  qptr->getSuspQ = NULL;
+   \   00003E 90BE ..      LDW       Y, S:?w4
+   \   000041 72A9 0002    ADDW      Y, #0x2
+   \   000045 90FF         LDW       (Y), X
+    170          
+    171                  /* Initialise the insert/remove pointers */
+    172                  qptr->insert_index = 0;
+   \   000047 BE ..        LDW       X, S:?w4
+   \   000049 1C 000E      ADDW      X, #0xe
+   \   00004C 9093         LDW       Y, X
+   \   00004E 5F           CLRW      X
+   \   00004F BF ..        LDW       S:?w1, X
+   \   000051 BF ..        LDW       S:?w0, X
+   \   000053 93           LDW       X, Y
+   \   000054 CD ....      CALL      L:?load32_0x_l0
+    173                  qptr->remove_index = 0;
+   \   000057 BE ..        LDW       X, S:?w4
+   \   000059 1C 0012      ADDW      X, #0x12
+   \   00005C CD ....      CALL      L:?load32_0x_l0
+    174                  qptr->num_msgs_stored = 0;
+   \   00005F 90BE ..      LDW       Y, S:?w4
+   \   000062 72A9 0016    ADDW      Y, #0x16
+   \   000066 93           LDW       X, Y
+   \   000067 CD ....      CALL      L:?load32_0x_l0
+    175          
+    176                  /* Successful */
+    177                  status = ATOM_OK;
+   \   00006A 4F           CLR       A
+    178              }
+    179          
+    180              return (status);
+   \   00006B CC ....      JP        L:?epilogue_w4
+    181          }
+    182          
+    183          
+    184          /**
+    185           * \b atomQueueDelete
+    186           *
+    187           * Deletes a queue object.
+    188           *
+    189           * Any threads currently suspended on the queue will be woken up with
+    190           * return status ATOM_ERR_DELETED. If called at thread context then the
+    191           * scheduler will be called during this function which may schedule in one
+    192           * of the woken threads depending on relative priorities.
+    193           *
+    194           * This function can be called from interrupt context, but loops internally
+    195           * waking up all threads blocking on the queue, so the potential
+    196           * execution cycles cannot be determined in advance.
+    197           *
+    198           * @param[in] qptr Pointer to queue object
+    199           *
+    200           * @retval ATOM_OK Success
+    201           * @retval ATOM_ERR_QUEUE Problem putting a woken thread on the ready queue
+    202           * @retval ATOM_ERR_TIMER Problem cancelling a timeout on a woken thread
+    203           */
+
+   \                                 In section .near_func.text, align 1
+    204          uint8_t atomQueueDelete (ATOM_QUEUE *qptr)
+    205          {
+   \                     atomQueueDelete:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w7
+   \   000006 3B ....      PUSH      S:?b12
+   \   000009 BF ..        LDW       S:?w7, X
+    206              uint8_t status;
+    207              CRITICAL_STORE;
+    208              ATOM_TCB *tcb_ptr;
+    209              uint8_t woken_threads = FALSE;
+   \   00000B 3F ..        CLR       S:?b11
+    210          
+    211              /* Parameter check */
+    212              if (qptr == NULL)
+   \   00000D 5D           TNZW      X
+   \   00000E 26 07        JRNE      L:??atomQueueDelete_0
+    213              {
+    214                  /* Bad pointer */
+    215                  status = ATOM_ERR_PARAM;
+   \   000010 35 C9 ....   MOV       S:?b10, #0xc9
+   \   000014 CC ....      JP        L:??atomQueueDelete_1
+    216              }
+    217              else
+    218              {
+    219                  /* Default to success status unless errors occur during wakeup */
+    220                  status = ATOM_OK;
+   \                     ??atomQueueDelete_0:
+   \   000017 3F ..        CLR       S:?b10
+   \   000019 20 16        JRA       L:??atomQueueDelete_2
+    221          
+    222                  /* Wake up all suspended tasks */
+    223                  while (1)
+    224                  {
+    225                      /* Enter critical region */
+    226                      CRITICAL_START ();
+    227          
+    228                      /* Check if any threads are suspended */
+    229                      if (((tcb_ptr = tcbDequeueHead (&qptr->getSuspQ)) != NULL)
+    230                          || ((tcb_ptr = tcbDequeueHead (&qptr->putSuspQ)) != NULL))
+    231                      {
+    232                          /* A thread is waiting on a suspend queue */
+    233          
+    234                          /* Return error status to the waiting thread */
+    235                          tcb_ptr->suspend_wake_status = ATOM_ERR_DELETED;
+    236          
+    237                          /* Put the thread on the ready queue */
+    238                          if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) != ATOM_OK)
+    239                          {
+    240                              /* Exit critical region */
+    241                              CRITICAL_END ();
+    242          
+    243                              /* Quit the loop, returning error */
+    244                              status = ATOM_ERR_QUEUE;
+    245                              break;
+    246                          }
+    247          
+    248                          /* If there's a timeout on this suspension, cancel it */
+    249                          if (tcb_ptr->suspend_timo_cb)
+    250                          {
+    251                              /* Cancel the callback */
+    252                              if (atomTimerCancel (tcb_ptr->suspend_timo_cb) != ATOM_OK)
+    253                              {
+    254                                  /* Exit critical region */
+    255                                  CRITICAL_END ();
+    256          
+    257                                  /* Quit the loop, returning error */
+    258                                  status = ATOM_ERR_TIMER;
+    259                                  break;
+    260                              }
+    261          
+    262                              /* Flag as no timeout registered */
+    263                              tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomQueueDelete_3:
+   \   00001B 5F           CLRW      X
+   \   00001C 90BE ..      LDW       Y, S:?w4
+   \   00001F 90FF         LDW       (Y), X
+    264          
+    265                          }
+    266          
+    267                          /* Exit critical region */
+    268                          CRITICAL_END ();
+   \                     ??atomQueueDelete_4:
+   \   000021 B6 ..        LD        A, S:?b12
+   \   000023 B7 ..        LD        S:?b0, A
+   \   000025 8A           PUSH      CC
+   \   000026 84           POP       A
+   \   000027 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000029 BA ..        OR        A, S:?b0
+   \   00002B 88           PUSH      A
+   \   00002C 86           POP       CC
+    269          
+    270                          /* Request a reschedule */
+    271                          woken_threads = TRUE;
+   \   00002D 35 01 ....   MOV       S:?b11, #0x1
+   \                     ??atomQueueDelete_2:
+   \   000031 8A           PUSH      CC
+   \   000032 84           POP       A
+   \   000033 A4 28        AND       A, #0x28
+   \   000035 B7 ..        LD        S:?b12, A
+   \   000037 9B           SIM
+   \   000038 BE ..        LDW       X, S:?w7
+   \   00003A 1C 0002      ADDW      X, #0x2
+   \   00003D CD ....      CALL      L:tcbDequeueHead
+   \   000040 BF ..        LDW       S:?w4, X
+   \   000042 26 09        JRNE      L:??atomQueueDelete_5
+   \   000044 BE ..        LDW       X, S:?w7
+   \   000046 CD ....      CALL      L:tcbDequeueHead
+   \   000049 BF ..        LDW       S:?w4, X
+   \   00004B 27 4C        JREQ      L:??atomQueueDelete_6
+   \                     ??atomQueueDelete_5:
+   \   00004D A6 CA        LD        A, #0xca
+   \   00004F BE ..        LDW       X, S:?w4
+   \   000051 1C 000E      ADDW      X, #0xe
+   \   000054 F7           LD        (X), A
+   \   000055 90BE ..      LDW       Y, S:?w4
+   \   000058 AE ....      LDW       X, #tcbReadyQ
+   \   00005B CD ....      CALL      L:tcbEnqueuePriority
+   \   00005E A1 00        CP        A, #0x0
+   \   000060 27 12        JREQ      L:??atomQueueDelete_7
+   \   000062 B6 ..        LD        A, S:?b12
+   \   000064 B7 ..        LD        S:?b0, A
+   \   000066 8A           PUSH      CC
+   \   000067 84           POP       A
+   \   000068 A4 D7        AND       A, #0xffffffffffffffd7
+   \   00006A BA ..        OR        A, S:?b0
+   \   00006C 88           PUSH      A
+   \   00006D 86           POP       CC
+   \   00006E 35 CC ....   MOV       S:?b10, #0xcc
+   \   000072 20 31        JRA       L:??atomQueueDelete_8
+   \                     ??atomQueueDelete_7:
+   \   000074 BE ..        LDW       X, S:?w4
+   \   000076 1C 000F      ADDW      X, #0xf
+   \   000079 BF ..        LDW       S:?w4, X
+   \   00007B 92CE ..      LDW       X, [S:?w4.w]
+   \   00007E 27 A1        JREQ      L:??atomQueueDelete_4
+   \   000080 CD ....      CALL      L:atomTimerCancel
+   \   000083 A1 00        CP        A, #0x0
+   \   000085 27 94        JREQ      L:??atomQueueDelete_3
+   \   000087 B6 ..        LD        A, S:?b12
+   \   000089 B7 ..        LD        S:?b0, A
+   \   00008B 8A           PUSH      CC
+   \   00008C 84           POP       A
+   \   00008D A4 D7        AND       A, #0xffffffffffffffd7
+   \   00008F BA ..        OR        A, S:?b0
+   \   000091 88           PUSH      A
+   \   000092 86           POP       CC
+   \   000093 35 CD ....   MOV       S:?b10, #0xcd
+   \   000097 20 0C        JRA       L:??atomQueueDelete_8
+    272                      }
+    273          
+    274                      /* No more suspended threads */
+    275                      else
+    276                      {
+    277                          /* Exit critical region and quit the loop */
+    278                          CRITICAL_END ();
+   \                     ??atomQueueDelete_6:
+   \   000099 B6 ..        LD        A, S:?b12
+   \   00009B B7 ..        LD        S:?b0, A
+   \   00009D 8A           PUSH      CC
+   \   00009E 84           POP       A
+   \   00009F A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000A1 BA ..        OR        A, S:?b0
+   \   0000A3 88           PUSH      A
+   \   0000A4 86           POP       CC
+    279                          break;
+    280                      }
+    281                  }
+    282          
+    283                  /* Call scheduler if any threads were woken up */
+    284                  if (woken_threads == TRUE)
+   \                     ??atomQueueDelete_8:
+   \   0000A5 B6 ..        LD        A, S:?b11
+   \   0000A7 4A           DEC       A
+   \   0000A8 26 0A        JRNE      L:??atomQueueDelete_1
+    285                  {
+    286                      /**
+    287                       * Only call the scheduler if we are in thread context, otherwise
+    288                       * it will be called on exiting the ISR by atomIntExit().
+    289                       */
+    290                      if (atomCurrentContext())
+   \   0000AA CD ....      CALL      L:atomCurrentContext
+   \   0000AD 5D           TNZW      X
+   \   0000AE 27 04        JREQ      L:??atomQueueDelete_1
+    291                          atomSched (FALSE);
+   \   0000B0 4F           CLR       A
+   \   0000B1 CD ....      CALL      L:atomSched
+    292                  }
+    293              }
+    294          
+    295              return (status);
+   \                     ??atomQueueDelete_1:
+   \   0000B4 B6 ..        LD        A, S:?b10
+   \   0000B6 32 ....      POP       S:?b12
+   \   0000B9 CD ....      CALL      L:?pop_w7
+   \   0000BC CC ....      JP        L:?epilogue_l2
+    296          }
+    297          
+    298          
+    299          /**
+    300           * \b atomQueueGet
+    301           *
+    302           * Attempt to retrieve a message from a queue.
+    303           *
+    304           * Retrieves one message at a time. Messages are copied into the passed
+    305           * \c msgptr storage area which should be large enough to contain one
+    306           * message of \c unit_size bytes. Where multiple messages are in the queue,
+    307           * messages are retrieved in FIFO order.
+    308           *
+    309           * If the queue is currently empty, the call will do one of the following
+    310           * depending on the \c timeout value specified:
+    311           *
+    312           * \c timeout == 0 : Call will block until a message is available \n
+    313           * \c timeout > 0 : Call will block until a message or the specified timeout \n
+    314           * \c timeout == -1 : Return immediately if no message is on the queue \n
+    315           *
+    316           * If a maximum timeout value is specified (\c timeout > 0), and no message
+    317           * is present on the queue for the specified number of system ticks, the
+    318           * call will return with \c ATOM_TIMEOUT.
+    319           *
+    320           * This function can only be called from interrupt context if the \c timeout
+    321           * parameter is -1 (in which case it does not block).
+    322           *
+    323           * @param[in] qptr Pointer to queue object
+    324           * @param[in] timeout Max system ticks to block (0 = forever, -1 =  no block)
+    325           * @param[out] msgptr Pointer to which the received message will be copied
+    326           *
+    327           * @retval ATOM_OK Success
+    328           * @retval ATOM_TIMEOUT Queue wait timed out before being woken
+    329           * @retval ATOM_WOULDBLOCK Called with timeout == -1 but queue was empty
+    330           * @retval ATOM_ERR_DELETED Queue was deleted while suspended
+    331           * @retval ATOM_ERR_CONTEXT Not called in thread context and attempted to block
+    332           * @retval ATOM_ERR_PARAM Bad parameter
+    333           * @retval ATOM_ERR_QUEUE Problem putting the thread on the suspend queue
+    334           * @retval ATOM_ERR_TIMER Problem registering the timeout
+    335           */
+
+   \                                 In section .near_func.text, align 1
+    336          uint8_t atomQueueGet (ATOM_QUEUE *qptr, int32_t timeout, uint8_t *msgptr)
+    337          {
+   \                     atomQueueGet:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 89           PUSHW     X
+   \   000007 9089         PUSHW     Y
+   \   000009 52 12        SUB       SP, #0x12
+   \   00000B CD ....      CALL      L:?mov_l2_l0
+    338              CRITICAL_STORE;
+    339              uint8_t status;
+    340              QUEUE_TIMER timer_data;
+    341              ATOM_TIMER timer_cb;
+    342              ATOM_TCB *curr_tcb_ptr;
+    343          
+    344              /* Check parameters */
+    345              if ((qptr == NULL) || (msgptr == NULL))
+   \   00000E 1E 15        LDW       X, (0x15,SP)
+   \   000010 27 04        JREQ      L:??atomQueueGet_0
+   \   000012 1E 13        LDW       X, (0x13,SP)
+   \   000014 26 07        JRNE      L:??atomQueueGet_1
+    346              {
+    347                  /* Bad pointer */
+    348                  status = ATOM_ERR_PARAM;
+   \                     ??atomQueueGet_0:
+   \   000016 35 C9 ....   MOV       S:?b15, #0xc9
+   \   00001A CC ....      JP        L:??atomQueueGet_2
+    349              }
+    350              else
+    351              {
+    352                  /* Protect access to the queue object and OS queues */
+    353                  CRITICAL_START ();
+   \                     ??atomQueueGet_1:
+   \   00001D 8A           PUSH      CC
+   \   00001E 84           POP       A
+   \   00001F A4 28        AND       A, #0x28
+   \   000021 B7 ..        LD        S:?b14, A
+   \   000023 9B           SIM
+    354          
+    355                  /* If no messages on the queue, block the calling thread */
+    356                  if (qptr->num_msgs_stored == 0)
+   \   000024 1E 15        LDW       X, (0x15,SP)
+   \   000026 1C 0016      ADDW      X, #0x16
+   \   000029 CD ....      CALL      L:?load32_l0_0x
+   \   00002C BE ..        LDW       X, S:?w0
+   \   00002E A3 0000      CPW       X, #0x0
+   \   000031 26 02        JRNE      L:??atomQueueGet_3
+   \   000033 BE ..        LDW       X, S:?w1
+   \                     ??atomQueueGet_3:
+   \   000035 27 03        JREQ      ??lb_0
+   \   000037 CC ....      JP        L:??atomQueueGet_4
+    357                  {
+    358                      /* If called with timeout >= 0, we should block */
+    359                      if (timeout >= 0)
+   \                     ??lb_0:
+   \   00003A 3D ..        TNZ       S:?b8
+   \   00003C 2A 03        JRPL      ??lb_1
+   \   00003E CC ....      JP        L:??atomQueueGet_5
+    360                      {
+    361                          /* Queue is empty, block the calling thread */
+    362          
+    363                          /* Get the current TCB */
+    364                          curr_tcb_ptr = atomCurrentContext();
+   \                     ??lb_1:
+   \   000041 CD ....      CALL      L:atomCurrentContext
+   \   000044 BF ..        LDW       S:?w6, X
+    365          
+    366                          /* Check we are actually in thread context */
+    367                          if (curr_tcb_ptr)
+   \   000046 26 03        JRNE      ??lb_2
+   \   000048 CC ....      JP        L:??atomQueueGet_6
+    368                          {
+    369                              /* Add current thread to the list suspended on receives */
+    370                              if (tcbEnqueuePriority (&qptr->getSuspQ, curr_tcb_ptr) == ATOM_OK)
+   \                     ??lb_2:
+   \   00004B 1E 15        LDW       X, (0x15,SP)
+   \   00004D 5C           INCW      X
+   \   00004E 5C           INCW      X
+   \   00004F 1F 01        LDW       (0x1,SP), X
+   \   000051 90BE ..      LDW       Y, S:?w6
+   \   000054 1E 01        LDW       X, (0x1,SP)
+   \   000056 CD ....      CALL      L:tcbEnqueuePriority
+   \   000059 A1 00        CP        A, #0x0
+   \   00005B 27 03        JREQ      ??lb_3
+   \   00005D CC ....      JP        L:??atomQueueGet_7
+   \                     ??lb_3:
+   \   000060 A6 01        LD        A, #0x1
+   \   000062 BE ..        LDW       X, S:?w6
+   \   000064 1C 000D      ADDW      X, #0xd
+   \   000067 F7           LD        (X), A
+    371                              {
+    372                                  /* Set suspended status for the current thread */
+    373                                  curr_tcb_ptr->suspended = TRUE;
+    374          
+    375                                  /* Track errors */
+    376                                  status = ATOM_OK;
+   \   000068 3F ..        CLR       S:?b15
+   \   00006A BE ..        LDW       X, S:?w4
+   \   00006C 26 02        JRNE      L:??atomQueueGet_8
+   \   00006E BE ..        LDW       X, S:?w5
+   \                     ??atomQueueGet_8:
+   \   000070 27 52        JREQ      L:??atomQueueGet_9
+    377          
+    378                                  /* Register a timer callback if requested */
+    379                                  if (timeout)
+    380                                  {
+    381                                      /**
+    382                                       * Fill out the data needed by the callback to
+    383                                       * wake us up.
+    384                                       */
+    385                                      timer_data.tcb_ptr = curr_tcb_ptr;
+   \   000072 BE ..        LDW       X, S:?w6
+   \   000074 1F 03        LDW       (0x3,SP), X
+    386                                      timer_data.queue_ptr = qptr;
+   \   000076 1E 15        LDW       X, (0x15,SP)
+   \   000078 1F 05        LDW       (0x5,SP), X
+    387                                      timer_data.suspQ = &qptr->getSuspQ;
+   \   00007A 1E 01        LDW       X, (0x1,SP)
+   \   00007C 1F 07        LDW       (0x7,SP), X
+    388          
+    389                                      /* Fill out the timer callback request structure */
+    390                                      timer_cb.cb_func = atomQueueTimerCallback;
+   \   00007E AE ....      LDW       X, #atomQueueTimerCallback
+   \   000081 1F 09        LDW       (0x9,SP), X
+    391                                      timer_cb.cb_data = (POINTER)&timer_data;
+   \   000083 96           LDW       X, SP
+   \   000084 1C 0003      ADDW      X, #0x3
+   \   000087 1F 0B        LDW       (0xb,SP), X
+    392                                      timer_cb.cb_ticks = timeout;
+   \   000089 CD ....      CALL      L:?load32_dbsp_l2
+   \   00008C 0D           DC8       0xd
+    393          
+    394                                      /**
+    395                                       * Store the timer details in the TCB so that we
+    396                                       * can cancel the timer callback if the queue is
+    397                                       * put before the timeout occurs.
+    398                                       */
+    399                                      curr_tcb_ptr->suspend_timo_cb = &timer_cb;
+   \   00008D 96           LDW       X, SP
+   \   00008E 1C 0009      ADDW      X, #0x9
+   \   000091 90BE ..      LDW       Y, S:?w6
+   \   000094 72A9 000F    ADDW      Y, #0xf
+   \   000098 90FF         LDW       (Y), X
+    400          
+    401                                      /* Register a callback on timeout */
+    402                                      if (atomTimerRegister (&timer_cb) != ATOM_OK)
+   \   00009A 96           LDW       X, SP
+   \   00009B 1C 0009      ADDW      X, #0x9
+   \   00009E CD ....      CALL      L:atomTimerRegister
+   \   0000A1 A1 00        CP        A, #0x0
+   \   0000A3 27 29        JREQ      L:??atomQueueGet_10
+    403                                      {
+    404                                          /* Timer registration failed */
+    405                                          status = ATOM_ERR_TIMER;
+   \   0000A5 35 CD ....   MOV       S:?b15, #0xcd
+    406          
+    407                                          /* Clean up and return to the caller */
+    408                                          (void)tcbDequeueEntry (&qptr->getSuspQ, curr_tcb_ptr);
+   \   0000A9 90BE ..      LDW       Y, S:?w6
+   \   0000AC 1E 01        LDW       X, (0x1,SP)
+   \   0000AE CD ....      CALL      L:tcbDequeueEntry
+    409                                          curr_tcb_ptr->suspended = FALSE;
+   \   0000B1 4F           CLR       A
+   \   0000B2 BE ..        LDW       X, S:?w6
+   \   0000B4 1C 000D      ADDW      X, #0xd
+   \   0000B7 F7           LD        (X), A
+    410                                          curr_tcb_ptr->suspend_timo_cb = NULL;
+   \   0000B8 5F           CLRW      X
+   \   0000B9 90BE ..      LDW       Y, S:?w6
+   \   0000BC 72A9 000F    ADDW      Y, #0xf
+   \   0000C0 90FF         LDW       (Y), X
+   \   0000C2 20 0A        JRA       L:??atomQueueGet_10
+    411                                      }
+    412                                  }
+    413          
+    414                                  /* Set no timeout requested */
+    415                                  else
+    416                                  {
+    417                                      /* No need to cancel timeouts on this one */
+    418                                      curr_tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomQueueGet_9:
+   \   0000C4 5F           CLRW      X
+   \   0000C5 90BE ..      LDW       Y, S:?w6
+   \   0000C8 72A9 000F    ADDW      Y, #0xf
+   \   0000CC 90FF         LDW       (Y), X
+    419                                  }
+    420          
+    421                                  /* Exit critical region */
+    422                                  CRITICAL_END ();
+   \                     ??atomQueueGet_10:
+   \   0000CE B6 ..        LD        A, S:?b14
+   \   0000D0 B7 ..        LD        S:?b0, A
+   \   0000D2 8A           PUSH      CC
+   \   0000D3 84           POP       A
+   \   0000D4 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000D6 BA ..        OR        A, S:?b0
+   \   0000D8 88           PUSH      A
+   \   0000D9 86           POP       CC
+    423          
+    424                                  /* Check no errors occurred */
+    425                                  if (status == ATOM_OK)
+   \   0000DA 3D ..        TNZ       S:?b15
+   \   0000DC 26 7F        JRNE      L:??atomQueueGet_2
+    426                                  {
+    427                                      /**
+    428                                       * Current thread now blocking, schedule in a new
+    429                                       * one. We already know we are in thread context
+    430                                       * so can call the scheduler from here.
+    431                                       */
+    432                                      atomSched (FALSE);
+   \   0000DE 4F           CLR       A
+   \   0000DF CD ....      CALL      L:atomSched
+    433          
+    434                                      /**
+    435                                       * Normal atomQueuePut() wakeups will set ATOM_OK
+    436                                       * status, while timeouts will set ATOM_TIMEOUT
+    437                                       * and queue deletions will set ATOM_ERR_DELETED.
+    438                                       */
+    439                                      status = curr_tcb_ptr->suspend_wake_status;
+   \   0000E2 BE ..        LDW       X, S:?w6
+   \   0000E4 1C 000E      ADDW      X, #0xe
+   \   0000E7 F6           LD        A, (X)
+   \   0000E8 B7 ..        LD        S:?b15, A
+    440          
+    441                                      /**
+    442                                       * Check suspend_wake_status. If it is ATOM_OK
+    443                                       * then we were woken because a message has been
+    444                                       * put on the queue and we can now copy it out.
+    445                                       * Otherwise we were woken because we timed out
+    446                                       * waiting for a message, or the queue was
+    447                                       * deleted, so we should just quit.
+    448                                       */
+    449                                      if (status == ATOM_OK)
+   \   0000EA 26 71        JRNE      L:??atomQueueGet_2
+    450                                      {
+    451                                          /* Enter critical region */
+    452                                          CRITICAL_START();
+   \   0000EC 8A           PUSH      CC
+   \   0000ED 84           POP       A
+   \   0000EE A4 28        AND       A, #0x28
+   \   0000F0 B7 ..        LD        S:?b14, A
+   \   0000F2 9B           SIM
+    453          
+    454                                          /* Copy the message out of the queue */
+    455                                          status = queue_remove (qptr, msgptr);
+   \   0000F3 16 13        LDW       Y, (0x13,SP)
+   \   0000F5 1E 15        LDW       X, (0x15,SP)
+   \   0000F7 CD ....      CALL      L:queue_remove
+   \   0000FA B7 ..        LD        S:?b15, A
+    456          
+    457                                          /* Exit critical region */
+    458                                          CRITICAL_END();
+   \   0000FC B6 ..        LD        A, S:?b14
+   \   0000FE B7 ..        LD        S:?b0, A
+   \   000100 8A           PUSH      CC
+   \   000101 84           POP       A
+   \   000102 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000104 BA ..        OR        A, S:?b0
+   \   000106 88           PUSH      A
+   \   000107 86           POP       CC
+   \   000108 20 53        JRA       L:??atomQueueGet_2
+    459                                      }
+    460                                  }
+    461                              }
+    462                              else
+    463                              {
+    464                                  /* There was an error putting this thread on the suspend list */
+    465                                  CRITICAL_END ();
+   \                     ??atomQueueGet_7:
+   \   00010A B6 ..        LD        A, S:?b14
+   \   00010C B7 ..        LD        S:?b0, A
+   \   00010E 8A           PUSH      CC
+   \   00010F 84           POP       A
+   \   000110 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000112 BA ..        OR        A, S:?b0
+   \   000114 88           PUSH      A
+   \   000115 86           POP       CC
+    466                                  status = ATOM_ERR_QUEUE;
+   \   000116 35 CC ....   MOV       S:?b15, #0xcc
+   \   00011A 20 41        JRA       L:??atomQueueGet_2
+    467                              }
+    468                          }
+    469                          else
+    470                          {
+    471                              /* Not currently in thread context, can't suspend */
+    472                              CRITICAL_END ();
+   \                     ??atomQueueGet_6:
+   \   00011C B6 ..        LD        A, S:?b14
+   \   00011E B7 ..        LD        S:?b0, A
+   \   000120 8A           PUSH      CC
+   \   000121 84           POP       A
+   \   000122 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000124 BA ..        OR        A, S:?b0
+   \   000126 88           PUSH      A
+   \   000127 86           POP       CC
+    473                              status = ATOM_ERR_CONTEXT;
+   \   000128 35 C8 ....   MOV       S:?b15, #0xc8
+   \   00012C 20 2F        JRA       L:??atomQueueGet_2
+    474                          }
+    475                      }
+    476                      else
+    477                      {
+    478                          /* timeout == -1, requested not to block and queue is empty */
+    479                          CRITICAL_END();
+   \                     ??atomQueueGet_5:
+   \   00012E B7 ..        LD        S:?b0, A
+   \   000130 8A           PUSH      CC
+   \   000131 84           POP       A
+   \   000132 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000134 BA ..        OR        A, S:?b0
+   \   000136 88           PUSH      A
+   \   000137 86           POP       CC
+    480                          status = ATOM_WOULDBLOCK;
+   \   000138 35 03 ....   MOV       S:?b15, #0x3
+   \   00013C 20 1F        JRA       L:??atomQueueGet_2
+    481                      }
+    482                  }
+    483                  else
+    484                  {
+    485                      /* No need to block, there is a message to copy out of the queue */
+    486                      status = queue_remove (qptr, msgptr);
+   \                     ??atomQueueGet_4:
+   \   00013E 16 13        LDW       Y, (0x13,SP)
+   \   000140 1E 15        LDW       X, (0x15,SP)
+   \   000142 CD ....      CALL      L:queue_remove
+   \   000145 B7 ..        LD        S:?b15, A
+    487          
+    488                      /* Exit critical region */
+    489                      CRITICAL_END ();
+   \   000147 B6 ..        LD        A, S:?b14
+   \   000149 B7 ..        LD        S:?b0, A
+   \   00014B 8A           PUSH      CC
+   \   00014C 84           POP       A
+   \   00014D A4 D7        AND       A, #0xffffffffffffffd7
+   \   00014F BA ..        OR        A, S:?b0
+   \   000151 88           PUSH      A
+   \   000152 86           POP       CC
+    490          
+    491                      /**
+    492                       * The scheduler may now make a policy decision to thread
+    493                       * switch if we are currently in thread context. If we are
+    494                       * in interrupt context it will be handled by atomIntExit().
+    495                       */
+    496                      if (atomCurrentContext())
+   \   000153 CD ....      CALL      L:atomCurrentContext
+   \   000156 5D           TNZW      X
+   \   000157 27 04        JREQ      L:??atomQueueGet_2
+    497                          atomSched (FALSE);
+   \   000159 4F           CLR       A
+   \   00015A CD ....      CALL      L:atomSched
+    498                  }
+    499              }
+    500          
+    501              return (status);
+   \                     ??atomQueueGet_2:
+   \   00015D B6 ..        LD        A, S:?b15
+   \   00015F 5B 16        ADD       SP, #0x16
+   \   000161 CC ....      JP        L:?epilogue_l2_l3
+    502          }
+    503          
+    504          
+    505          /**
+    506           * \b atomQueuePut
+    507           *
+    508           * Attempt to put a message onto a queue.
+    509           *
+    510           * Sends one message at a time. Messages are copied from the passed
+    511           * \c msgptr storage area which should contain a message of \c unit_size
+    512           * bytes.
+    513           *
+    514           * If the queue is currently full, the call will do one of the following
+    515           * depending on the \c timeout value specified:
+    516           *
+    517           * \c timeout == 0 : Call will block until space is available \n
+    518           * \c timeout > 0 : Call will block until space or the specified timeout \n
+    519           * \c timeout == -1 : Return immediately if the queue is full \n
+    520           *
+    521           * If a maximum timeout value is specified (\c timeout > 0), and no space
+    522           * is available on the queue for the specified number of system ticks, the
+    523           * call will return with \c ATOM_TIMEOUT.
+    524           *
+    525           * This function can only be called from interrupt context if the \c timeout
+    526           * parameter is -1 (in which case it does not block and may fail to post a
+    527           * message if the queue is full).
+    528           *
+    529           * @param[in] qptr Pointer to queue object
+    530           * @param[in] timeout Max system ticks to block (0 = forever, -1 =  no block)
+    531           * @param[out] msgptr Pointer from which the message should be copied out
+    532           *
+    533           * @retval ATOM_OK Success
+    534           * @retval ATOM_WOULDBLOCK Called with timeout == -1 but queue was full
+    535           * @retval ATOM_TIMEOUT Queue wait timed out before being woken
+    536           * @retval ATOM_ERR_DELETED Queue was deleted while suspended
+    537           * @retval ATOM_ERR_CONTEXT Not called in thread context and attempted to block
+    538           * @retval ATOM_ERR_PARAM Bad parameter
+    539           * @retval ATOM_ERR_QUEUE Problem putting the thread on the suspend queue
+    540           * @retval ATOM_ERR_TIMER Problem registering the timeout
+    541           */
+
+   \                                 In section .near_func.text, align 1
+    542          uint8_t atomQueuePut (ATOM_QUEUE *qptr, int32_t timeout, uint8_t *msgptr)
+    543          {
+   \                     atomQueuePut:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 89           PUSHW     X
+   \   000007 9089         PUSHW     Y
+   \   000009 52 10        SUB       SP, #0x10
+   \   00000B CD ....      CALL      L:?mov_l3_l0
+    544              CRITICAL_STORE;
+    545              uint8_t status;
+    546              QUEUE_TIMER timer_data;
+    547              ATOM_TIMER timer_cb;
+    548              ATOM_TCB *curr_tcb_ptr;
+    549          
+    550              /* Check parameters */
+    551              if ((qptr == NULL) || (msgptr == NULL))
+   \   00000E 1E 13        LDW       X, (0x13,SP)
+   \   000010 27 04        JREQ      L:??atomQueuePut_0
+   \   000012 1E 11        LDW       X, (0x11,SP)
+   \   000014 26 07        JRNE      L:??atomQueuePut_1
+    552              {
+    553                  /* Bad pointer */
+    554                  status = ATOM_ERR_PARAM;
+   \                     ??atomQueuePut_0:
+   \   000016 35 C9 ....   MOV       S:?b11, #0xc9
+   \   00001A CC ....      JP        L:??atomQueuePut_2
+    555              }
+    556              else
+    557              {
+    558                  /* Protect access to the queue object and OS queues */
+    559                  CRITICAL_START ();
+   \                     ??atomQueuePut_1:
+   \   00001D 8A           PUSH      CC
+   \   00001E 84           POP       A
+   \   00001F A4 28        AND       A, #0x28
+   \   000021 B7 ..        LD        S:?b10, A
+   \   000023 9B           SIM
+    560          
+    561                  /* If queue is full, block the calling thread */
+    562                  if (qptr->num_msgs_stored == qptr->max_num_msgs)
+   \   000024 16 13        LDW       Y, (0x13,SP)
+   \   000026 72A9 000A    ADDW      Y, #0xa
+   \   00002A 1E 13        LDW       X, (0x13,SP)
+   \   00002C 1C 0016      ADDW      X, #0x16
+   \   00002F CD ....      CALL      L:?load32_l0_0x
+   \   000032 93           LDW       X, Y
+   \   000033 CD ....      CALL      L:?ucmp32_c_l0_0x
+   \   000036 27 03        JREQ      ??lb_4
+   \   000038 CC ....      JP        L:??atomQueuePut_3
+    563                  {
+    564                      /* If called with timeout >= 0, we should block */
+    565                      if (timeout >= 0)
+   \                     ??lb_4:
+   \   00003B 3D ..        TNZ       S:?b12
+   \   00003D 2A 03        JRPL      ??lb_5
+   \   00003F CC ....      JP        L:??atomQueuePut_4
+    566                      {
+    567                          /* Queue is full, block the calling thread */
+    568          
+    569                          /* Get the current TCB */
+    570                          curr_tcb_ptr = atomCurrentContext();
+   \                     ??lb_5:
+   \   000042 CD ....      CALL      L:atomCurrentContext
+   \   000045 BF ..        LDW       S:?w4, X
+    571          
+    572                          /* Check we are actually in thread context */
+    573                          if (curr_tcb_ptr)
+   \   000047 26 03        JRNE      ??lb_6
+   \   000049 CC ....      JP        L:??atomQueuePut_5
+    574                          {
+    575                              /* Add current thread to the suspend list on sends */
+    576                              if (tcbEnqueuePriority (&qptr->putSuspQ, curr_tcb_ptr) == ATOM_OK)
+   \                     ??lb_6:
+   \   00004C 90BE ..      LDW       Y, S:?w4
+   \   00004F 1E 13        LDW       X, (0x13,SP)
+   \   000051 CD ....      CALL      L:tcbEnqueuePriority
+   \   000054 A1 00        CP        A, #0x0
+   \   000056 27 03        JREQ      ??lb_7
+   \   000058 CC ....      JP        L:??atomQueuePut_6
+   \                     ??lb_7:
+   \   00005B A6 01        LD        A, #0x1
+   \   00005D BE ..        LDW       X, S:?w4
+   \   00005F 1C 000D      ADDW      X, #0xd
+   \   000062 F7           LD        (X), A
+    577                              {
+    578                                  /* Set suspended status for the current thread */
+    579                                  curr_tcb_ptr->suspended = TRUE;
+    580          
+    581                                  /* Track errors */
+    582                                  status = ATOM_OK;
+   \   000063 3F ..        CLR       S:?b11
+   \   000065 BE ..        LDW       X, S:?w6
+   \   000067 26 02        JRNE      L:??atomQueuePut_7
+   \   000069 BE ..        LDW       X, S:?w7
+   \                     ??atomQueuePut_7:
+   \   00006B 27 50        JREQ      L:??atomQueuePut_8
+    583          
+    584                                  /* Register a timer callback if requested */
+    585                                  if (timeout)
+    586                                  {
+    587                                      /**
+    588                                       * Fill out the data needed by the callback to
+    589                                       * wake us up.
+    590                                       */
+    591                                      timer_data.tcb_ptr = curr_tcb_ptr;
+   \   00006D BE ..        LDW       X, S:?w4
+   \   00006F 1F 01        LDW       (0x1,SP), X
+    592                                      timer_data.queue_ptr = qptr;
+   \   000071 1E 13        LDW       X, (0x13,SP)
+   \   000073 1F 03        LDW       (0x3,SP), X
+    593                                      timer_data.suspQ = &qptr->putSuspQ;
+   \   000075 1E 13        LDW       X, (0x13,SP)
+   \   000077 1F 05        LDW       (0x5,SP), X
+    594          
+    595          
+    596                                      /* Fill out the timer callback request structure */
+    597                                      timer_cb.cb_func = atomQueueTimerCallback;
+   \   000079 AE ....      LDW       X, #atomQueueTimerCallback
+   \   00007C 1F 07        LDW       (0x7,SP), X
+    598                                      timer_cb.cb_data = (POINTER)&timer_data;
+   \   00007E 96           LDW       X, SP
+   \   00007F 5C           INCW      X
+   \   000080 1F 09        LDW       (0x9,SP), X
+    599                                      timer_cb.cb_ticks = timeout;
+   \   000082 CD ....      CALL      L:?load32_dbsp_l3
+   \   000085 0B           DC8       0xb
+    600          
+    601                                      /**
+    602                                       * Store the timer details in the TCB so that we
+    603                                       * can cancel the timer callback if a message is
+    604                                       * removed from the queue before the timeout
+    605                                       * occurs.
+    606                                       */
+    607                                      curr_tcb_ptr->suspend_timo_cb = &timer_cb;
+   \   000086 96           LDW       X, SP
+   \   000087 1C 0007      ADDW      X, #0x7
+   \   00008A 90BE ..      LDW       Y, S:?w4
+   \   00008D 72A9 000F    ADDW      Y, #0xf
+   \   000091 90FF         LDW       (Y), X
+    608          
+    609                                      /* Register a callback on timeout */
+    610                                      if (atomTimerRegister (&timer_cb) != ATOM_OK)
+   \   000093 96           LDW       X, SP
+   \   000094 1C 0007      ADDW      X, #0x7
+   \   000097 CD ....      CALL      L:atomTimerRegister
+   \   00009A A1 00        CP        A, #0x0
+   \   00009C 27 29        JREQ      L:??atomQueuePut_9
+    611                                      {
+    612                                          /* Timer registration failed */
+    613                                          status = ATOM_ERR_TIMER;
+   \   00009E 35 CD ....   MOV       S:?b11, #0xcd
+    614          
+    615                                          /* Clean up and return to the caller */
+    616                                          (void)tcbDequeueEntry (&qptr->putSuspQ, curr_tcb_ptr);
+   \   0000A2 90BE ..      LDW       Y, S:?w4
+   \   0000A5 1E 13        LDW       X, (0x13,SP)
+   \   0000A7 CD ....      CALL      L:tcbDequeueEntry
+    617                                          curr_tcb_ptr->suspended = FALSE;
+   \   0000AA 4F           CLR       A
+   \   0000AB BE ..        LDW       X, S:?w4
+   \   0000AD 1C 000D      ADDW      X, #0xd
+   \   0000B0 F7           LD        (X), A
+    618                                          curr_tcb_ptr->suspend_timo_cb = NULL;
+   \   0000B1 5F           CLRW      X
+   \   0000B2 90BE ..      LDW       Y, S:?w4
+   \   0000B5 72A9 000F    ADDW      Y, #0xf
+   \   0000B9 90FF         LDW       (Y), X
+   \   0000BB 20 0A        JRA       L:??atomQueuePut_9
+    619                                      }
+    620                                  }
+    621          
+    622                                  /* Set no timeout requested */
+    623                                  else
+    624                                  {
+    625                                      /* No need to cancel timeouts on this one */
+    626                                      curr_tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??atomQueuePut_8:
+   \   0000BD 5F           CLRW      X
+   \   0000BE 90BE ..      LDW       Y, S:?w4
+   \   0000C1 72A9 000F    ADDW      Y, #0xf
+   \   0000C5 90FF         LDW       (Y), X
+    627                                  }
+    628          
+    629                                  /* Exit critical region */
+    630                                  CRITICAL_END ();
+   \                     ??atomQueuePut_9:
+   \   0000C7 B6 ..        LD        A, S:?b10
+   \   0000C9 B7 ..        LD        S:?b0, A
+   \   0000CB 8A           PUSH      CC
+   \   0000CC 84           POP       A
+   \   0000CD A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000CF BA ..        OR        A, S:?b0
+   \   0000D1 88           PUSH      A
+   \   0000D2 86           POP       CC
+    631          
+    632                                  /* Check timer registration was successful */
+    633                                  if (status == ATOM_OK)
+   \   0000D3 3D ..        TNZ       S:?b11
+   \   0000D5 26 7F        JRNE      L:??atomQueuePut_2
+    634                                  {
+    635                                      /**
+    636                                       * Current thread now blocking, schedule in a new
+    637                                       * one. We already know we are in thread context
+    638                                       * so can call the scheduler from here.
+    639                                       */
+    640                                      atomSched (FALSE);
+   \   0000D7 4F           CLR       A
+   \   0000D8 CD ....      CALL      L:atomSched
+    641          
+    642                                      /**
+    643                                       * Normal atomQueueGet() wakeups will set ATOM_OK
+    644                                       * status, while timeouts will set ATOM_TIMEOUT
+    645                                       * and queue deletions will set ATOM_ERR_DELETED.
+    646                                       */
+    647                                      status = curr_tcb_ptr->suspend_wake_status;
+   \   0000DB BE ..        LDW       X, S:?w4
+   \   0000DD 1C 000E      ADDW      X, #0xe
+   \   0000E0 F6           LD        A, (X)
+   \   0000E1 B7 ..        LD        S:?b11, A
+    648          
+    649                                      /**
+    650                                       * Check suspend_wake_status. If it is ATOM_OK
+    651                                       * then we were woken because a message has been
+    652                                       * removed from the queue and we can now add ours.
+    653                                       * Otherwise we were woken because we timed out
+    654                                       * waiting for a message, or the queue was
+    655                                       * deleted, so we should just quit.
+    656                                       */
+    657                                      if (status == ATOM_OK)
+   \   0000E3 26 71        JRNE      L:??atomQueuePut_2
+    658                                      {
+    659                                          /* Enter critical region */
+    660                                          CRITICAL_START();
+   \   0000E5 8A           PUSH      CC
+   \   0000E6 84           POP       A
+   \   0000E7 A4 28        AND       A, #0x28
+   \   0000E9 B7 ..        LD        S:?b10, A
+   \   0000EB 9B           SIM
+    661          
+    662                                          /* Copy the message into the queue */
+    663                                          status = queue_insert (qptr, msgptr);
+   \   0000EC 16 11        LDW       Y, (0x11,SP)
+   \   0000EE 1E 13        LDW       X, (0x13,SP)
+   \   0000F0 CD ....      CALL      L:queue_insert
+   \   0000F3 B7 ..        LD        S:?b11, A
+    664          
+    665                                          /* Exit critical region */
+    666                                          CRITICAL_END();
+   \   0000F5 B6 ..        LD        A, S:?b10
+   \   0000F7 B7 ..        LD        S:?b0, A
+   \   0000F9 8A           PUSH      CC
+   \   0000FA 84           POP       A
+   \   0000FB A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000FD BA ..        OR        A, S:?b0
+   \   0000FF 88           PUSH      A
+   \   000100 86           POP       CC
+   \   000101 20 53        JRA       L:??atomQueuePut_2
+    667                                      }
+    668                                  }
+    669                              }
+    670                              else
+    671                              {
+    672                                  /* There was an error putting this thread on the suspend list */
+    673                                  CRITICAL_END ();
+   \                     ??atomQueuePut_6:
+   \   000103 B6 ..        LD        A, S:?b10
+   \   000105 B7 ..        LD        S:?b0, A
+   \   000107 8A           PUSH      CC
+   \   000108 84           POP       A
+   \   000109 A4 D7        AND       A, #0xffffffffffffffd7
+   \   00010B BA ..        OR        A, S:?b0
+   \   00010D 88           PUSH      A
+   \   00010E 86           POP       CC
+    674                                  status = ATOM_ERR_QUEUE;
+   \   00010F 35 CC ....   MOV       S:?b11, #0xcc
+   \   000113 20 41        JRA       L:??atomQueuePut_2
+    675                              }
+    676                          }
+    677                          else
+    678                          {
+    679                              /* Not currently in thread context, can't suspend */
+    680                              CRITICAL_END ();
+   \                     ??atomQueuePut_5:
+   \   000115 B6 ..        LD        A, S:?b10
+   \   000117 B7 ..        LD        S:?b0, A
+   \   000119 8A           PUSH      CC
+   \   00011A 84           POP       A
+   \   00011B A4 D7        AND       A, #0xffffffffffffffd7
+   \   00011D BA ..        OR        A, S:?b0
+   \   00011F 88           PUSH      A
+   \   000120 86           POP       CC
+    681                              status = ATOM_ERR_CONTEXT;
+   \   000121 35 C8 ....   MOV       S:?b11, #0xc8
+   \   000125 20 2F        JRA       L:??atomQueuePut_2
+    682                          }
+    683                      }
+    684                      else
+    685                      {
+    686                          /* timeout == -1, cannot block. Just return queue is full */
+    687                          CRITICAL_END();
+   \                     ??atomQueuePut_4:
+   \   000127 B7 ..        LD        S:?b0, A
+   \   000129 8A           PUSH      CC
+   \   00012A 84           POP       A
+   \   00012B A4 D7        AND       A, #0xffffffffffffffd7
+   \   00012D BA ..        OR        A, S:?b0
+   \   00012F 88           PUSH      A
+   \   000130 86           POP       CC
+    688                          status = ATOM_WOULDBLOCK;
+   \   000131 35 03 ....   MOV       S:?b11, #0x3
+   \   000135 20 1F        JRA       L:??atomQueuePut_2
+    689                      }
+    690                  }
+    691                  else
+    692                  {
+    693                      /* No need to block, there is space to copy into the queue */
+    694                      status = queue_insert (qptr, msgptr);
+   \                     ??atomQueuePut_3:
+   \   000137 16 11        LDW       Y, (0x11,SP)
+   \   000139 1E 13        LDW       X, (0x13,SP)
+   \   00013B CD ....      CALL      L:queue_insert
+   \   00013E B7 ..        LD        S:?b11, A
+    695          
+    696                      /* Exit critical region */
+    697                      CRITICAL_END ();
+   \   000140 B6 ..        LD        A, S:?b10
+   \   000142 B7 ..        LD        S:?b0, A
+   \   000144 8A           PUSH      CC
+   \   000145 84           POP       A
+   \   000146 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000148 BA ..        OR        A, S:?b0
+   \   00014A 88           PUSH      A
+   \   00014B 86           POP       CC
+    698          
+    699                      /**
+    700                       * The scheduler may now make a policy decision to thread
+    701                       * switch if we are currently in thread context. If we are
+    702                       * in interrupt context it will be handled by atomIntExit().
+    703                       */
+    704                      if (atomCurrentContext())
+   \   00014C CD ....      CALL      L:atomCurrentContext
+   \   00014F 5D           TNZW      X
+   \   000150 27 04        JREQ      L:??atomQueuePut_2
+    705                          atomSched (FALSE);
+   \   000152 4F           CLR       A
+   \   000153 CD ....      CALL      L:atomSched
+    706                  }
+    707              }
+    708          
+    709              return (status);
+   \                     ??atomQueuePut_2:
+   \   000156 B6 ..        LD        A, S:?b11
+   \   000158 5B 14        ADD       SP, #0x14
+   \   00015A CC ....      JP        L:?epilogue_l2_l3
+    710          }
+    711          
+    712          
+    713          /**
+    714           * \b atomQueueTimerCallback
+    715           *
+    716           * This is an internal function not for use by application code.
+    717           *
+    718           * Timeouts on suspended threads are notified by the timer system through
+    719           * this generic callback. The timer system calls us back with a pointer to
+    720           * the relevant \c QUEUE_TIMER object which is used to retrieve the
+    721           * queue details.
+    722           *
+    723           * @param[in] cb_data Pointer to a QUEUE_TIMER object
+    724           */
+
+   \                                 In section .near_func.text, align 1
+    725          static void atomQueueTimerCallback (POINTER cb_data)
+    726          {
+   \                     atomQueueTimerCallback:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 3B ....      PUSH      S:?b10
+   \   000006 BF ..        LDW       S:?w4, X
+    727              QUEUE_TIMER *timer_data_ptr;
+    728              CRITICAL_STORE;
+    729          
+    730              /* Get the QUEUE_TIMER structure pointer */
+    731              timer_data_ptr = (QUEUE_TIMER *)cb_data;
+    732          
+    733              /* Check parameter is valid */
+    734              if (timer_data_ptr)
+   \   000008 27 3D        JREQ      L:??atomQueueTimerCallback_0
+    735              {
+    736                  /* Enter critical region */
+    737                  CRITICAL_START ();
+   \   00000A 8A           PUSH      CC
+   \   00000B 84           POP       A
+   \   00000C A4 28        AND       A, #0x28
+   \   00000E B7 ..        LD        S:?b10, A
+   \   000010 9B           SIM
+    738          
+    739                  /* Set status to indicate to the waiting thread that it timed out */
+    740                  timer_data_ptr->tcb_ptr->suspend_wake_status = ATOM_TIMEOUT;
+   \   000011 92CE ..      LDW       X, [S:?w4.w]
+   \   000014 1C 000E      ADDW      X, #0xe
+   \   000017 A6 02        LD        A, #0x2
+   \   000019 F7           LD        (X), A
+    741          
+    742                  /* Flag as no timeout registered */
+    743                  timer_data_ptr->tcb_ptr->suspend_timo_cb = NULL;
+   \   00001A 92CE ..      LDW       X, [S:?w4.w]
+   \   00001D 9093         LDW       Y, X
+   \   00001F 5F           CLRW      X
+   \   000020 72A9 000F    ADDW      Y, #0xf
+   \   000024 90FF         LDW       (Y), X
+    744          
+    745                  /**
+    746                   * Remove this thread from the queue's suspend list. Handles threads
+    747                   * suspended on the receive list as well as the send list.
+    748                   */
+    749                  (void)tcbDequeueEntry (timer_data_ptr->suspQ, timer_data_ptr->tcb_ptr);
+   \   000026 91CE ..      LDW       Y, [S:?w4.w]
+   \   000029 BE ..        LDW       X, S:?w4
+   \   00002B 1C 0004      ADDW      X, #0x4
+   \   00002E FE           LDW       X, (X)
+   \   00002F CD ....      CALL      L:tcbDequeueEntry
+    750          
+    751                  /* Put the thread on the ready queue */
+    752                  (void)tcbEnqueuePriority (&tcbReadyQ, timer_data_ptr->tcb_ptr);
+   \   000032 91CE ..      LDW       Y, [S:?w4.w]
+   \   000035 AE ....      LDW       X, #tcbReadyQ
+   \   000038 CD ....      CALL      L:tcbEnqueuePriority
+    753          
+    754                  /* Exit critical region */
+    755                  CRITICAL_END ();
+   \   00003B B6 ..        LD        A, S:?b10
+   \   00003D B7 ..        LD        S:?b0, A
+   \   00003F 8A           PUSH      CC
+   \   000040 84           POP       A
+   \   000041 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000043 BA ..        OR        A, S:?b0
+   \   000045 88           PUSH      A
+   \   000046 86           POP       CC
+    756          
+    757                  /**
+    758                   * Note that we don't call the scheduler now as it will be called
+    759                   * when we exit the ISR by atomIntExit().
+    760                   */
+    761              }
+    762          }
+   \                     ??atomQueueTimerCallback_0:
+   \   000047 32 ....      POP       S:?b10
+   \   00004A CC ....      JP        L:?epilogue_w4
+    763          
+    764          
+    765          /**
+    766           * \b queue_remove
+    767           *
+    768           * This is an internal function not for use by application code.
+    769           *
+    770           * Removes a message from a queue. Assumes that there is a message present,
+    771           * which is already checked by the calling functions with interrupts locked
+    772           * out.
+    773           *
+    774           * Also wakes up a suspended thread if there are any waiting to send on the
+    775           * queue.
+    776           *
+    777           * Assumes interrupts are already locked out.
+    778           *
+    779           * @param[in] qptr Pointer to an ATOM_QUEUE object
+    780           * @param[in] msgptr Destination pointer for the message to be copied into
+    781           *
+    782           * @retval ATOM_OK Success
+    783           * @retval ATOM_ERR_PARAM Bad parameter
+    784           * @retval ATOM_ERR_QUEUE Problem putting a thread on the ready queue
+    785           * @retval ATOM_ERR_TIMER Problem cancelling a timeout
+    786           */
+
+   \                                 In section .near_func.text, align 1
+    787          static uint8_t queue_remove (ATOM_QUEUE *qptr, uint8_t* msgptr)
+    788          {
+   \                     queue_remove:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w6
+   \   000006 BF ..        LDW       S:?w4, X
+   \   000008 90BF ..      LDW       S:?w1, Y
+    789              uint8_t status;
+    790              ATOM_TCB *tcb_ptr;
+    791          
+    792              /* Check parameters */
+    793              if ((qptr == NULL) || (msgptr == NULL))
+   \   00000B 5D           TNZW      X
+   \   00000C 27 04        JREQ      L:??queue_remove_0
+   \   00000E BE ..        LDW       X, S:?w1
+   \   000010 26 05        JRNE      L:??queue_remove_1
+    794              {
+    795                  /* Bad pointer */
+    796                  status = ATOM_ERR_PARAM;
+   \                     ??queue_remove_0:
+   \   000012 A6 C9        LD        A, #0xc9
+   \   000014 CC ....      JP        L:?epilogue_l2_w6
+    797              }
+    798              else
+    799              {
+    800                  /* There is a message on the queue, copy it out */
+    801                  memcpy (msgptr, (qptr->buff_ptr + qptr->remove_index), qptr->unit_size);
+   \                     ??queue_remove_1:
+   \   000017 BE ..        LDW       X, S:?w4
+   \   000019 1C 0012      ADDW      X, #0x12
+   \   00001C BF ..        LDW       S:?w5, X
+   \   00001E BE ..        LDW       X, S:?w4
+   \   000020 1C 0006      ADDW      X, #0x6
+   \   000023 BF ..        LDW       S:?w6, X
+   \   000025 CD ....      CALL      L:?load32_l1_0x
+   \   000028 CD ....      CALL      L:?mov_w0_w3
+   \   00002B BE ..        LDW       X, S:?w4
+   \   00002D 1C 0004      ADDW      X, #0x4
+   \   000030 FE           LDW       X, (X)
+   \   000031 9093         LDW       Y, X
+   \   000033 BE ..        LDW       X, S:?w5
+   \   000035 CD ....      CALL      L:?load32_l1_0x
+   \   000038 93           LDW       X, Y
+   \   000039 72BB ....    ADDW      X, S:?w3
+   \   00003D 9093         LDW       Y, X
+   \   00003F BE ..        LDW       X, S:?w1
+   \   000041 CD ....      CALL      L:memcpy
+    802                  qptr->remove_index += qptr->unit_size;
+   \   000044 BE ..        LDW       X, S:?w6
+   \   000046 CD ....      CALL      L:?load32_l0_0x
+   \   000049 BE ..        LDW       X, S:?w5
+   \   00004B CD ....      CALL      L:?add32_l0_l0_0x
+   \   00004E CD ....      CALL      L:?load32_0x_l0
+    803                  qptr->num_msgs_stored--;
+   \   000051 BE ..        LDW       X, S:?w4
+   \   000053 1C 0016      ADDW      X, #0x16
+   \   000056 9093         LDW       Y, X
+   \   000058 CD ....      CALL      L:?load32_l0_0x
+   \   00005B CD ....      CALL      L:?dec32_l0_l0
+   \   00005E 93           LDW       X, Y
+   \   00005F CD ....      CALL      L:?load32_0x_l0
+    804          
+    805                  /* Check if the remove index should now wrap to the beginning */
+    806                  if (qptr->remove_index >= (qptr->unit_size * qptr->max_num_msgs))
+   \   000062 BE ..        LDW       X, S:?w4
+   \   000064 1C 000A      ADDW      X, #0xa
+   \   000067 CD ....      CALL      L:?load32_l0_0x
+   \   00006A BE ..        LDW       X, S:?w6
+   \   00006C CD ....      CALL      L:?mul32_l0_l0_0x
+   \   00006F CD ....      CALL      L:?mov_l1_l0
+   \   000072 BE ..        LDW       X, S:?w5
+   \   000074 CD ....      CALL      L:?load32_l0_0x
+   \   000077 CD ....      CALL      L:?ucmp32_c_l0_l1
+   \   00007A 25 0A        JRC       L:??queue_remove_2
+    807                      qptr->remove_index = 0;
+   \   00007C 5F           CLRW      X
+   \   00007D BF ..        LDW       S:?w1, X
+   \   00007F BF ..        LDW       S:?w0, X
+   \   000081 BE ..        LDW       X, S:?w5
+   \   000083 CD ....      CALL      L:?load32_0x_l0
+    808          
+    809                  /**
+    810                   * If there are threads waiting to send, wake one up now. Waiting
+    811                   * threads are woken up in priority order, with same-priority
+    812                   * threads woken up in FIFO order.
+    813                   */
+    814                  tcb_ptr = tcbDequeueHead (&qptr->putSuspQ);
+   \                     ??queue_remove_2:
+   \   000086 BE ..        LDW       X, S:?w4
+   \   000088 CD ....      CALL      L:tcbDequeueHead
+   \   00008B BF ..        LDW       S:?w4, X
+    815                  if (tcb_ptr)
+   \   00008D 27 39        JREQ      L:??queue_remove_3
+    816                  {
+    817                      /* Move the waiting thread to the ready queue */
+    818                      if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) == ATOM_OK)
+   \   00008F 90BE ..      LDW       Y, S:?w4
+   \   000092 AE ....      LDW       X, #tcbReadyQ
+   \   000095 CD ....      CALL      L:tcbEnqueuePriority
+   \   000098 A1 00        CP        A, #0x0
+   \   00009A 26 27        JRNE      L:??queue_remove_4
+    819                      {
+    820                          /* Set OK status to be returned to the waiting thread */
+    821                          tcb_ptr->suspend_wake_status = ATOM_OK;
+   \   00009C 4F           CLR       A
+   \   00009D BE ..        LDW       X, S:?w4
+   \   00009F 1C 000E      ADDW      X, #0xe
+   \   0000A2 F7           LD        (X), A
+    822          
+    823                          /* If there's a timeout on this suspension, cancel it */
+    824                          if ((tcb_ptr->suspend_timo_cb != NULL)
+    825                              && (atomTimerCancel (tcb_ptr->suspend_timo_cb) != ATOM_OK))
+   \   0000A3 BE ..        LDW       X, S:?w4
+   \   0000A5 1C 000F      ADDW      X, #0xf
+   \   0000A8 BF ..        LDW       S:?w4, X
+   \   0000AA 92CE ..      LDW       X, [S:?w4.w]
+   \   0000AD 27 0C        JREQ      L:??queue_remove_5
+   \   0000AF CD ....      CALL      L:atomTimerCancel
+   \   0000B2 A1 00        CP        A, #0x0
+   \   0000B4 27 05        JREQ      L:??queue_remove_5
+    826                          {
+    827                              /* There was a problem cancelling a timeout */
+    828                              status = ATOM_ERR_TIMER;
+   \   0000B6 A6 CD        LD        A, #0xcd
+   \   0000B8 CC ....      JP        L:?epilogue_l2_w6
+    829                          }
+    830                          else
+    831                          {
+    832                              /* Flag as no timeout registered */
+    833                              tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??queue_remove_5:
+   \   0000BB 5F           CLRW      X
+   \   0000BC 92CF ..      LDW       [S:?w4.w], X
+    834          
+    835                              /* Successful */
+    836                              status = ATOM_OK;
+   \   0000BF 4F           CLR       A
+   \   0000C0 CC ....      JP        L:?epilogue_l2_w6
+    837                          }
+    838                      }
+    839                      else
+    840                      {
+    841                          /**
+    842                           * There was a problem putting the thread on the ready
+    843                           * queue.
+    844                           */
+    845                          status = ATOM_ERR_QUEUE;
+   \                     ??queue_remove_4:
+   \   0000C3 A6 CC        LD        A, #0xcc
+   \   0000C5 CC ....      JP        L:?epilogue_l2_w6
+    846                      }
+    847                  }
+    848                  else
+    849                  {
+    850                      /* There were no threads waiting to send */
+    851                      status = ATOM_OK;
+   \                     ??queue_remove_3:
+   \   0000C8 4F           CLR       A
+    852                  }
+    853              }
+    854          
+    855              return (status);
+   \   0000C9 CC ....      JP        L:?epilogue_l2_w6
+    856          }
+    857          
+    858          
+    859          /**
+    860           * \b queue_insert
+    861           *
+    862           * This is an internal function not for use by application code.
+    863           *
+    864           * Inserts a message onto a queue. Assumes that the queue has space for one
+    865           * message, which has already been checked by the calling function with
+    866           * interrupts locked out.
+    867           *
+    868           * Also wakes up a suspended thread if there are any waiting to receive on the
+    869           * queue.
+    870           *
+    871           * Assumes interrupts are already locked out.
+    872           *
+    873           * @param[in] qptr Pointer to an ATOM_QUEUE object
+    874           * @param[in] msgptr Source pointer for the message to be copied out of
+    875           *
+    876           * @retval ATOM_OK Success
+    877           * @retval ATOM_ERR_PARAM Bad parameter
+    878           * @retval ATOM_ERR_QUEUE Problem putting a thread on the ready queue
+    879           * @retval ATOM_ERR_TIMER Problem cancelling a timeout
+    880           */
+
+   \                                 In section .near_func.text, align 1
+    881          static uint8_t queue_insert (ATOM_QUEUE *qptr, uint8_t* msgptr)
+    882          {
+   \                     queue_insert:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w6
+   \   000006 BF ..        LDW       S:?w4, X
+    883              uint8_t status;
+    884              ATOM_TCB *tcb_ptr;
+    885          
+    886              /* Check parameters */
+    887              if ((qptr == NULL) || (msgptr == NULL))
+   \   000008 27 04        JREQ      L:??queue_insert_0
+   \   00000A 905D         TNZW      Y
+   \   00000C 26 05        JRNE      L:??queue_insert_1
+    888              {
+    889                  /* Bad pointer */
+    890                  status = ATOM_ERR_PARAM;
+   \                     ??queue_insert_0:
+   \   00000E A6 C9        LD        A, #0xc9
+   \   000010 CC ....      JP        L:?epilogue_l2_w6
+    891              }
+    892              else
+    893              {
+    894                  /* There is space in the queue, copy it in */
+    895                  memcpy ((qptr->buff_ptr + qptr->insert_index), msgptr, qptr->unit_size);
+   \                     ??queue_insert_1:
+   \   000013 1C 000E      ADDW      X, #0xe
+   \   000016 BF ..        LDW       S:?w5, X
+   \   000018 BE ..        LDW       X, S:?w4
+   \   00001A 1C 0006      ADDW      X, #0x6
+   \   00001D BF ..        LDW       S:?w6, X
+   \   00001F CD ....      CALL      L:?load32_l0_0x
+   \   000022 CD ....      CALL      L:?mov_w0_w1
+   \   000025 CD ....      CALL      L:?mov_w2_w0
+   \   000028 BE ..        LDW       X, S:?w4
+   \   00002A 1C 0004      ADDW      X, #0x4
+   \   00002D FE           LDW       X, (X)
+   \   00002E BF ..        LDW       S:?w3, X
+   \   000030 BE ..        LDW       X, S:?w5
+   \   000032 CD ....      CALL      L:?load32_l0_0x
+   \   000035 BE ..        LDW       X, S:?w3
+   \   000037 72BB ....    ADDW      X, S:?w1
+   \   00003B CD ....      CALL      L:?mov_w0_w2
+   \   00003E CD ....      CALL      L:memcpy
+    896                  qptr->insert_index += qptr->unit_size;
+   \   000041 BE ..        LDW       X, S:?w6
+   \   000043 CD ....      CALL      L:?load32_l0_0x
+   \   000046 BE ..        LDW       X, S:?w5
+   \   000048 CD ....      CALL      L:?add32_l0_l0_0x
+   \   00004B CD ....      CALL      L:?load32_0x_l0
+    897                  qptr->num_msgs_stored++;
+   \   00004E BE ..        LDW       X, S:?w4
+   \   000050 1C 0016      ADDW      X, #0x16
+   \   000053 9093         LDW       Y, X
+   \   000055 CD ....      CALL      L:?load32_l0_0x
+   \   000058 CD ....      CALL      L:?inc32_l0_l0
+   \   00005B 93           LDW       X, Y
+   \   00005C CD ....      CALL      L:?load32_0x_l0
+    898          
+    899                  /* Check if the insert index should now wrap to the beginning */
+    900                  if (qptr->insert_index >= (qptr->unit_size * qptr->max_num_msgs))
+   \   00005F BE ..        LDW       X, S:?w4
+   \   000061 1C 000A      ADDW      X, #0xa
+   \   000064 CD ....      CALL      L:?load32_l0_0x
+   \   000067 BE ..        LDW       X, S:?w6
+   \   000069 CD ....      CALL      L:?mul32_l0_l0_0x
+   \   00006C CD ....      CALL      L:?mov_l1_l0
+   \   00006F BE ..        LDW       X, S:?w5
+   \   000071 CD ....      CALL      L:?load32_l0_0x
+   \   000074 CD ....      CALL      L:?ucmp32_c_l0_l1
+   \   000077 25 0A        JRC       L:??queue_insert_2
+    901                      qptr->insert_index = 0;
+   \   000079 5F           CLRW      X
+   \   00007A BF ..        LDW       S:?w1, X
+   \   00007C BF ..        LDW       S:?w0, X
+   \   00007E BE ..        LDW       X, S:?w5
+   \   000080 CD ....      CALL      L:?load32_0x_l0
+    902          
+    903                  /**
+    904                   * If there are threads waiting to receive, wake one up now. Waiting
+    905                   * threads are woken up in priority order, with same-priority
+    906                   * threads woken up in FIFO order.
+    907                   */
+    908                  tcb_ptr = tcbDequeueHead (&qptr->getSuspQ);
+   \                     ??queue_insert_2:
+   \   000083 BE ..        LDW       X, S:?w4
+   \   000085 1C 0002      ADDW      X, #0x2
+   \   000088 CD ....      CALL      L:tcbDequeueHead
+   \   00008B BF ..        LDW       S:?w4, X
+    909                  if (tcb_ptr)
+   \   00008D 27 39        JREQ      L:??queue_insert_3
+    910                  {
+    911                      /* Move the waiting thread to the ready queue */
+    912                      if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) == ATOM_OK)
+   \   00008F 90BE ..      LDW       Y, S:?w4
+   \   000092 AE ....      LDW       X, #tcbReadyQ
+   \   000095 CD ....      CALL      L:tcbEnqueuePriority
+   \   000098 A1 00        CP        A, #0x0
+   \   00009A 26 27        JRNE      L:??queue_insert_4
+    913                      {
+    914                          /* Set OK status to be returned to the waiting thread */
+    915                          tcb_ptr->suspend_wake_status = ATOM_OK;
+   \   00009C 4F           CLR       A
+   \   00009D BE ..        LDW       X, S:?w4
+   \   00009F 1C 000E      ADDW      X, #0xe
+   \   0000A2 F7           LD        (X), A
+    916          
+    917                          /* If there's a timeout on this suspension, cancel it */
+    918                          if ((tcb_ptr->suspend_timo_cb != NULL)
+    919                              && (atomTimerCancel (tcb_ptr->suspend_timo_cb) != ATOM_OK))
+   \   0000A3 BE ..        LDW       X, S:?w4
+   \   0000A5 1C 000F      ADDW      X, #0xf
+   \   0000A8 BF ..        LDW       S:?w4, X
+   \   0000AA 92CE ..      LDW       X, [S:?w4.w]
+   \   0000AD 27 0C        JREQ      L:??queue_insert_5
+   \   0000AF CD ....      CALL      L:atomTimerCancel
+   \   0000B2 A1 00        CP        A, #0x0
+   \   0000B4 27 05        JREQ      L:??queue_insert_5
+    920                          {
+    921                              /* There was a problem cancelling a timeout */
+    922                              status = ATOM_ERR_TIMER;
+   \   0000B6 A6 CD        LD        A, #0xcd
+   \   0000B8 CC ....      JP        L:?epilogue_l2_w6
+    923                          }
+    924                          else
+    925                          {
+    926                              /* Flag as no timeout registered */
+    927                              tcb_ptr->suspend_timo_cb = NULL;
+   \                     ??queue_insert_5:
+   \   0000BB 5F           CLRW      X
+   \   0000BC 92CF ..      LDW       [S:?w4.w], X
+    928          
+    929                              /* Successful */
+    930                              status = ATOM_OK;
+   \   0000BF 4F           CLR       A
+   \   0000C0 CC ....      JP        L:?epilogue_l2_w6
+    931                          }
+    932                      }
+    933                      else
+    934                      {
+    935                          /**
+    936                           * There was a problem putting the thread on the ready
+    937                           * queue.
+    938                           */
+    939                          status = ATOM_ERR_QUEUE;
+   \                     ??queue_insert_4:
+   \   0000C3 A6 CC        LD        A, #0xcc
+   \   0000C5 CC ....      JP        L:?epilogue_l2_w6
+    940                      }
+    941                  }
+    942                  else
+    943                  {
+    944                      /* There were no threads waiting to send */
+    945                      status = ATOM_OK;
+   \                     ??queue_insert_3:
+   \   0000C8 4F           CLR       A
+    946                  }
+    947              }
+    948          
+    949              return (status);
+   \   0000C9 CC ....      JP        L:?epilogue_l2_w6
+    950          }
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+     110  atomQueueCreate
+     191  atomQueueDelete
+     356  atomQueueGet
+     349  atomQueuePut
+      77  atomQueueTimerCallback
+     204  queue_insert
+     204  queue_remove
+
+ 
+ 1 491 bytes in section .near_func.text
+ 
+ 1 491 bytes of CODE memory
+
+Errors: none
+Warnings: 1

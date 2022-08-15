@@ -1,0 +1,922 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:16
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomtimer.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomtimer.c"
+#        -e -Om --no_unroll --no_inline --no_tbaa --no_cross_call --debug
+#        --code_model small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\atomtimer.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\atomtimer.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomtimer.c
+      1          /*
+      2           * Copyright (c) 2010, Kelvin Lawson. All rights reserved.
+      3           *
+      4           * Redistribution and use in source and binary forms, with or without
+      5           * modification, are permitted provided that the following conditions
+      6           * are met:
+      7           *
+      8           * 1. Redistributions of source code must retain the above copyright
+      9           *    notice, this list of conditions and the following disclaimer.
+     10           * 2. Redistributions in binary form must reproduce the above copyright
+     11           *    notice, this list of conditions and the following disclaimer in the
+     12           *    documentation and/or other materials provided with the distribution.
+     13           * 3. No personal names or organizations' names associated with the
+     14           *    Atomthreads project may be used to endorse or promote products
+     15           *    derived from this software without specific prior written permission.
+     16           *
+     17           * THIS SOFTWARE IS PROVIDED BY THE ATOMTHREADS PROJECT AND CONTRIBUTORS
+     18           * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+     19           * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     20           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE
+     21           * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     22           * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     23           * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     24           * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     25           * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     26           * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     27           * POSSIBILITY OF SUCH DAMAGE.
+     28           */
+     29          
+     30          
+     31          /** 
+     32           * \file
+     33           * Timer and system tick library.
+     34           *
+     35           *
+     36           * This module implements kernel system tick / clock functionality and timer
+     37           * functionality for kernel and application code.
+     38           *
+     39           * \par Timer callbacks
+     40           * Application and kernel code uses this module to request callbacks at a
+     41           * specific number of system ticks in the future. atomTimerRegister() can be
+     42           * called with a structure filled out requesting callbacks in a specific
+     43           * number of ticks. When the timer expires the requested callback function is
+     44           * called.
+     45           *
+     46           * \par Thread delays
+     47           * Application threads can use atomTimerDelay() to request that the thread
+     48           * delay for the specified number of system ticks. The thread will be put in
+     49           * the timer list and taken off the ready queue. When the timer expires the
+     50           * thread will be made ready-to-run again. This internally uses the same
+     51           * atomTimerRegister() function that is used for registering all timers.
+     52           *
+     53           * \par System tick / Clock
+     54           * This module also implements the system tick. At a predefined interval
+     55           * (SYSTEM_TICKS_PER_SEC) architecture ports arrange for atomTimerTick() to be
+     56           * called. The tick increments the system tick count, which can be queried by
+     57           * application code using atomTimeGet(). On this tick, the registered timer
+     58           * list is checked for any timers which have expired. Those which have expired
+     59           * have their callback functions called. It is also on this system tick that
+     60           * round-robin rescheduling time-slices occur. On exit from the tick interrupt
+     61           * handler the kernel checks whether there are two or more threads 
+     62           * ready-to-run at the same priority, and if so uses round-robin to schedule
+     63           * in the next thread. This is in contrast to other (non-timer-tick)
+     64           * interrupts which do not allow for round-robin rescheduling to occur, as
+     65           * they should only occur on a new timer tick.
+     66           *
+     67           */
+     68          
+     69          
+     70          #include "atom.h"
+     71          
+     72          
+     73          /* Data types */
+     74          
+     75          /* Delay callbacks data structure */
+     76          typedef struct delay_timer
+     77          {
+     78              ATOM_TCB *tcb_ptr;  /* Thread which is suspended with timeout */
+     79          
+     80          } DELAY_TIMER;
+     81          
+     82          
+     83          /* Global data */
+     84          
+     85          /* Local data */
+     86          
+     87          /** Pointer to the head of the outstanding timers queue */
+
+   \                                 In section .near.bss, align 1
+     88          static ATOM_TIMER *timer_queue = NULL;
+   \                     timer_queue:
+   \   000000              DS8 2
+     89          
+     90          /** Current system tick count */
+
+   \                                 In section .near.bss, align 1
+     91          static uint32_t system_ticks = 0;
+   \                     system_ticks:
+   \   000000              DS8 4
+     92          
+     93          
+     94          /* Forward declarations */
+     95          static void atomTimerCallbacks (void);
+     96          static void atomTimerDelayCallback (POINTER cb_data);
+     97          
+     98          
+     99          /**
+    100           * \b atomTimerRegister
+    101           *
+    102           * Register a timer callback.
+    103           *
+    104           * Callers should fill out and pass in a timer descriptor, containing
+    105           * the number of system ticks until they would like a callback, together
+    106           * with a callback function and optional parameter. The number of ticks
+    107           * must be greater than zero.
+    108           *
+    109           * On the relevant system tick count, the callback function will be
+    110           * called.
+    111           *
+    112           * These timers are used by some of the OS library routines, but they
+    113           * can also be used by application code requiring timer facilities at
+    114           * system tick resolution.
+    115           *
+    116           * This function can be called from interrupt context, but loops internally
+    117           * through the time list, so the potential execution cycles cannot be
+    118           * determined in advance.
+    119           *
+    120           * @param[in] timer_ptr Pointer to timer descriptor
+    121           *
+    122           * @retval ATOM_OK Success
+    123           * @retval ATOM_ERR_PARAM Bad parameters
+    124           */
+
+   \                                 In section .near_func.text, align 1
+    125          uint8_t atomTimerRegister (ATOM_TIMER *timer_ptr)
+    126          {
+   \                     atomTimerRegister:
+   \   000000 BF ..        LDW       S:?w0, X
+    127              uint8_t status;
+    128              CRITICAL_STORE;
+    129          
+    130              /* Parameter check */
+    131              if ((timer_ptr == NULL) || (timer_ptr->cb_func == NULL)
+    132                  || (timer_ptr->cb_ticks == 0))
+   \   000002 27 18        JREQ      L:??atomTimerRegister_0
+   \   000004 92CE ..      LDW       X, [S:?w0.w]
+   \   000007 27 13        JREQ      L:??atomTimerRegister_0
+   \   000009 BE ..        LDW       X, S:?w0
+   \   00000B 1C 0004      ADDW      X, #0x4
+   \   00000E CD ....      CALL      L:?load32_l1_0x
+   \   000011 BE ..        LDW       X, S:?w2
+   \   000013 A3 0000      CPW       X, #0x0
+   \   000016 26 02        JRNE      L:??atomTimerRegister_1
+   \   000018 BE ..        LDW       X, S:?w3
+   \                     ??atomTimerRegister_1:
+   \   00001A 26 03        JRNE      L:??atomTimerRegister_2
+    133              {
+    134                  /* Return error */
+    135                  status = ATOM_ERR_PARAM;
+   \                     ??atomTimerRegister_0:
+   \   00001C A6 C9        LD        A, #0xc9
+   \   00001E 81           RET
+    136              }
+    137              else
+    138              {
+    139                  /* Protect the list */
+    140                  CRITICAL_START ();
+   \                     ??atomTimerRegister_2:
+   \   00001F 8A           PUSH      CC
+   \   000020 84           POP       A
+   \   000021 A4 28        AND       A, #0x28
+   \   000023 9B           SIM
+    141          
+    142                  /*
+    143                   * Enqueue in the list of timers.
+    144                   *
+    145                   * The list is not ordered, all timers are inserted at the start
+    146                   * of the list. On each system tick increment the list is walked
+    147                   * and the remaining ticks count for that timer is decremented.
+    148                   * Once the remaining ticks reaches zero, the timer callback is
+    149                   * made.
+    150                   */
+    151                  if (timer_queue == NULL)
+   \   000024 BE ..        LDW       X, S:?w0
+   \   000026 1C 0008      ADDW      X, #0x8
+   \   000029 90CE ....    LDW       Y, L:timer_queue
+   \   00002D 26 0A        JRNE      L:??atomTimerRegister_3
+    152                  {
+    153                      /* List is empty, insert new head */
+    154                      timer_ptr->next_timer = NULL;
+   \   00002F 905F         CLRW      Y
+   \   000031 FF           LDW       (X), Y
+    155                      timer_queue = timer_ptr;
+   \   000032 BE ..        LDW       X, S:?w0
+   \   000034 CF ....      LDW       L:timer_queue, X
+   \   000037 20 0A        JRA       L:??atomTimerRegister_4
+    156                  }
+    157                  else
+    158                  {
+    159                      /* List has at least one entry, enqueue new timer before */
+    160                      timer_ptr->next_timer = timer_queue;
+   \                     ??atomTimerRegister_3:
+   \   000039 90CE ....    LDW       Y, L:timer_queue
+   \   00003D FF           LDW       (X), Y
+    161                      timer_queue = timer_ptr;
+   \   00003E BE ..        LDW       X, S:?w0
+   \   000040 CF ....      LDW       L:timer_queue, X
+    162                  }
+    163          
+    164                  /* End of list protection */
+    165                  CRITICAL_END ();
+   \                     ??atomTimerRegister_4:
+   \   000043 B7 ..        LD        S:?b0, A
+   \   000045 8A           PUSH      CC
+   \   000046 84           POP       A
+   \   000047 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000049 BA ..        OR        A, S:?b0
+   \   00004B 88           PUSH      A
+   \   00004C 86           POP       CC
+    166          
+    167                  /* Successful */
+    168                  status = ATOM_OK;
+   \   00004D 4F           CLR       A
+    169              }
+    170          
+    171              return (status);
+   \   00004E 81           RET
+    172          }
+    173          
+    174          
+    175          /**
+    176           * \b atomTimerCancel
+    177           *
+    178           * Cancel a timer callback previously registered using atomTimerRegister().
+    179           *
+    180           * This function can be called from interrupt context, but loops internally
+    181           * through the time list, so the potential execution cycles cannot be
+    182           * determined in advance.
+    183           *
+    184           * @param[in] timer_ptr Pointer to timer to cancel
+    185           *
+    186           * @retval ATOM_OK Success
+    187           * @retval ATOM_ERR_PARAM Bad parameters
+    188           * @retval ATOM_ERR_NOT_FOUND Timer registration was not found
+    189           */
+
+   \                                 In section .near_func.text, align 1
+    190          uint8_t atomTimerCancel (ATOM_TIMER *timer_ptr)
+    191          {
+   \                     atomTimerCancel:
+   \   000000 BF ..        LDW       S:?w2, X
+    192              uint8_t status = ATOM_ERR_NOT_FOUND;
+   \   000002 35 CE ....   MOV       S:?b2, #0xce
+    193              ATOM_TIMER *prev_ptr, *next_ptr;
+    194              CRITICAL_STORE;
+    195          
+    196              /* Parameter check */
+    197              if (timer_ptr == NULL)
+   \   000006 26 06        JRNE      L:??atomTimerCancel_0
+    198              {
+    199                  /* Return error */
+    200                  status = ATOM_ERR_PARAM;
+   \   000008 35 C9 ....   MOV       S:?b2, #0xc9
+   \   00000C 20 41        JRA       L:??atomTimerCancel_1
+    201              }
+    202              else
+    203              {
+    204                  /* Protect the list */
+    205                  CRITICAL_START ();
+   \                     ??atomTimerCancel_0:
+   \   00000E 8A           PUSH      CC
+   \   00000F 84           POP       A
+   \   000010 A4 28        AND       A, #0x28
+   \   000012 9B           SIM
+    206          
+    207                  /* Walk the list to find the relevant timer */
+    208                  prev_ptr = next_ptr = timer_queue;
+   \   000013 90CE ....    LDW       Y, L:timer_queue
+   \   000017 90BF ..      LDW       S:?w0, Y
+   \   00001A 20 05        JRA       L:??atomTimerCancel_2
+    209                  while (next_ptr)
+    210                  {
+    211                      /* Is this entry the one we're looking for? */
+    212                      if (next_ptr == timer_ptr)
+    213                      {
+    214                          if (next_ptr == timer_queue)
+    215                          {
+    216                              /* We're removing the list head */
+    217                              timer_queue = next_ptr->next_timer;
+    218                          }
+    219                          else
+    220                          {
+    221                              /* We're removing a mid or tail TCB */
+    222                              prev_ptr->next_timer = next_ptr->next_timer;
+    223                          }
+    224          
+    225                          /* Successful */
+    226                          status = ATOM_OK;
+    227                          break;
+    228                      }
+    229          
+    230                      /* Move on to the next in the list */
+    231                      prev_ptr = next_ptr;
+   \                     ??atomTimerCancel_3:
+   \   00001C 90BF ..      LDW       S:?w0, Y
+    232                      next_ptr = next_ptr->next_timer;
+   \   00001F 9093         LDW       Y, X
+   \                     ??atomTimerCancel_2:
+   \   000021 905D         TNZW      Y
+   \   000023 27 20        JREQ      L:??atomTimerCancel_4
+   \   000025 93           LDW       X, Y
+   \   000026 1C 0008      ADDW      X, #0x8
+   \   000029 FE           LDW       X, (X)
+   \   00002A 90B3 ..      CPW       Y, S:?w2
+   \   00002D 26 ED        JRNE      L:??atomTimerCancel_3
+   \   00002F 90C3 ....    CPW       Y, L:timer_queue
+   \   000033 26 05        JRNE      L:??atomTimerCancel_5
+   \   000035 CF ....      LDW       L:timer_queue, X
+   \   000038 20 09        JRA       L:??atomTimerCancel_6
+   \                     ??atomTimerCancel_5:
+   \   00003A 90BE ..      LDW       Y, S:?w0
+   \   00003D 72A9 0008    ADDW      Y, #0x8
+   \   000041 90FF         LDW       (Y), X
+   \                     ??atomTimerCancel_6:
+   \   000043 3F ..        CLR       S:?b2
+    233          
+    234                  }
+    235          
+    236                  /* End of list protection */
+    237                  CRITICAL_END ();
+   \                     ??atomTimerCancel_4:
+   \   000045 B7 ..        LD        S:?b0, A
+   \   000047 8A           PUSH      CC
+   \   000048 84           POP       A
+   \   000049 A4 D7        AND       A, #0xffffffffffffffd7
+   \   00004B BA ..        OR        A, S:?b0
+   \   00004D 88           PUSH      A
+   \   00004E 86           POP       CC
+    238               }
+    239          
+    240              return (status);
+   \                     ??atomTimerCancel_1:
+   \   00004F B6 ..        LD        A, S:?b2
+   \   000051 81           RET
+    241          }
+    242          
+    243          
+    244          /**
+    245           * \b atomTimeGet
+    246           *
+    247           * Returns the current system tick time.
+    248           *
+    249           * This function can be called from interrupt context.
+    250           *
+    251           * @retval Current system tick count
+    252          
+    253           */
+
+   \                                 In section .near_func.text, align 1
+    254          uint32_t atomTimeGet(void)
+    255          {
+    256              return (system_ticks);
+   \                     atomTimeGet:
+   \   000000 AE ....      LDW       X, #system_ticks
+   \   000003 CC ....      JP        L:?load32_l0_0x
+    257          }
+    258          
+    259          
+    260          /**
+    261           * \b atomTimeSet
+    262           *
+    263           * This is an internal function not for use by application code.
+    264           *
+    265           * Sets the current system tick time.
+    266           *
+    267           * Currently only required for automated test suite to test
+    268           * clock behaviour.
+    269           *
+    270           * This function can be called from interrupt context.
+    271           *
+    272           * @param[in] new_time New system tick time value
+    273           *
+    274           * @return None
+    275           */
+
+   \                                 In section .near_func.text, align 1
+    276          void atomTimeSet(uint32_t new_time)
+    277          {
+    278              system_ticks = new_time;
+   \                     atomTimeSet:
+   \   000000 AE ....      LDW       X, #system_ticks
+   \   000003 CC ....      JP        L:?load32_0x_l0
+    279          }
+    280          
+    281          
+    282          /**
+    283           * \b atomTimerTick
+    284           *
+    285           * System tick handler.
+    286           *
+    287           * User ports are responsible for calling this routine once per system tick.
+    288           *
+    289           * On each system tick this routine is called to do the following:
+    290           *  1. Increase the system tick count
+    291           *  2. Call back to any registered timer callbacks
+    292           *
+    293           * @return None
+    294           */
+
+   \                                 In section .near_func.text, align 1
+    295          void atomTimerTick (void)
+    296          {
+    297              /* Only do anything if the OS is started */
+    298              if (atomOSStarted)
+   \                     atomTimerTick:
+   \   000000 C6 ....      LD        A, L:atomOSStarted
+   \   000003 27 12        JREQ      L:??atomTimerTick_0
+    299              {
+    300                  /* Increment the system tick count */
+    301                  system_ticks++;
+   \   000005 AE ....      LDW       X, #system_ticks
+   \   000008 CD ....      CALL      L:?load32_l0_0x
+   \   00000B CD ....      CALL      L:?inc32_l0_l0
+   \   00000E AE ....      LDW       X, #system_ticks
+   \   000011 CD ....      CALL      L:?load32_0x_l0
+    302          
+    303                  /* Check for any callbacks that are due */
+    304                  atomTimerCallbacks ();
+   \   000014 CD ....      CALL      L:atomTimerCallbacks
+    305              }
+    306          }
+   \                     ??atomTimerTick_0:
+   \   000017 81           RET
+    307          
+    308          
+    309          /**
+    310           * \b atomTimerDelay
+    311           *
+    312           * Suspend a thread for the given number of system ticks.
+    313           *
+    314           * Note that the wakeup time is the number of ticks from the current system
+    315           * tick, therefore, for a one tick delay, the thread may be woken up at any
+    316           * time between the atomTimerDelay() call and the next system tick. For
+    317           * a minimum number of ticks, you should specify minimum number of ticks + 1.
+    318           *
+    319           * This function can only be called from thread context.
+    320           *
+    321           * @param[in] ticks Number of system ticks to delay (must be > 0)
+    322           *
+    323           * @retval ATOM_OK Successful delay
+    324           * @retval ATOM_ERR_PARAM Bad parameter (ticks must be non-zero)
+    325           * @retval ATOM_ERR_CONTEXT Not called from thread context
+    326           */
+
+   \                                 In section .near_func.text, align 1
+    327          uint8_t atomTimerDelay (uint32_t ticks)
+    328          {
+   \                     atomTimerDelay:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 52 0C        SUB       SP, #0xc
+   \   000005 CD ....      CALL      L:?mov_l2_l0
+    329              ATOM_TCB *curr_tcb_ptr;
+    330              ATOM_TIMER timer_cb;
+    331              DELAY_TIMER timer_data;
+    332              CRITICAL_STORE;
+    333              uint8_t status;
+    334          
+    335              /* Get the current TCB  */
+    336              curr_tcb_ptr = atomCurrentContext();
+   \   000008 CD ....      CALL      L:atomCurrentContext
+   \   00000B 9093         LDW       Y, X
+    337          
+    338              /* Parameter check */
+    339              if (ticks == 0)
+   \   00000D BE ..        LDW       X, S:?w4
+   \   00000F A3 0000      CPW       X, #0x0
+   \   000012 26 02        JRNE      L:??atomTimerDelay_0
+   \   000014 BE ..        LDW       X, S:?w5
+   \                     ??atomTimerDelay_0:
+   \   000016 26 06        JRNE      L:??atomTimerDelay_1
+    340              {
+    341                  /* Return error */
+    342                  status = ATOM_ERR_PARAM;
+   \   000018 35 C9 ....   MOV       S:?b8, #0xc9
+   \   00001C 20 61        JRA       L:??atomTimerDelay_2
+    343              }
+    344          
+    345              /* Check we are actually in thread context */
+    346              else if (curr_tcb_ptr == NULL)
+   \                     ??atomTimerDelay_1:
+   \   00001E 905D         TNZW      Y
+   \   000020 26 06        JRNE      L:??atomTimerDelay_3
+    347              {
+    348                  /* Not currently in thread context, can't suspend */
+    349                  status = ATOM_ERR_CONTEXT;
+   \   000022 35 C8 ....   MOV       S:?b8, #0xc8
+   \   000026 20 57        JRA       L:??atomTimerDelay_2
+    350              }
+    351          
+    352              /* Otherwise safe to proceed */
+    353              else
+    354              {
+    355                  /* Protect the system queues */
+    356                  CRITICAL_START ();
+   \                     ??atomTimerDelay_3:
+   \   000028 8A           PUSH      CC
+   \   000029 84           POP       A
+   \   00002A A4 28        AND       A, #0x28
+   \   00002C B7 ..        LD        S:?b2, A
+   \   00002E 9B           SIM
+    357          
+    358                  /* Set suspended status for the current thread */
+    359                  curr_tcb_ptr->suspended = TRUE;
+   \   00002F A6 01        LD        A, #0x1
+   \   000031 93           LDW       X, Y
+   \   000032 1C 000D      ADDW      X, #0xd
+   \   000035 F7           LD        (X), A
+    360          
+    361                  /* Register the timer callback */
+    362          
+    363                  /* Fill out the data needed by the callback to wake us up */
+    364                  timer_data.tcb_ptr = curr_tcb_ptr;
+   \   000036 93           LDW       X, Y
+   \   000037 1F 01        LDW       (0x1,SP), X
+    365          
+    366                  /* Fill out the timer callback request structure */
+    367                  timer_cb.cb_func = atomTimerDelayCallback;
+   \   000039 AE ....      LDW       X, #atomTimerDelayCallback
+   \   00003C 1F 03        LDW       (0x3,SP), X
+    368                  timer_cb.cb_data = (POINTER)&timer_data;
+   \   00003E 96           LDW       X, SP
+   \   00003F 5C           INCW      X
+   \   000040 1F 05        LDW       (0x5,SP), X
+    369                  timer_cb.cb_ticks = ticks;
+   \   000042 CD ....      CALL      L:?load32_dbsp_l2
+   \   000045 07           DC8       0x7
+    370          
+    371                  /* Store the timeout callback details, though we don't use it */
+    372                  curr_tcb_ptr->suspend_timo_cb = &timer_cb;
+   \   000046 96           LDW       X, SP
+   \   000047 1C 0003      ADDW      X, #0x3
+   \   00004A 72A9 000F    ADDW      Y, #0xf
+   \   00004E 90FF         LDW       (Y), X
+    373          
+    374                  /* Register the callback */
+    375                  if (atomTimerRegister (&timer_cb) != ATOM_OK)
+   \   000050 96           LDW       X, SP
+   \   000051 1C 0003      ADDW      X, #0x3
+   \   000054 CD ....      CALL      L:atomTimerRegister
+   \   000057 A1 00        CP        A, #0x0
+   \   000059 27 12        JREQ      L:??atomTimerDelay_4
+    376                  {
+    377                      /* Exit critical region */
+    378                      CRITICAL_END ();
+   \   00005B B6 ..        LD        A, S:?b2
+   \   00005D B7 ..        LD        S:?b0, A
+   \   00005F 8A           PUSH      CC
+   \   000060 84           POP       A
+   \   000061 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000063 BA ..        OR        A, S:?b0
+   \   000065 88           PUSH      A
+   \   000066 86           POP       CC
+    379          
+    380                      /* Timer registration didn't work, won't get a callback */
+    381                      status = ATOM_ERR_TIMER;
+   \   000067 35 CD ....   MOV       S:?b8, #0xcd
+   \   00006B 20 12        JRA       L:??atomTimerDelay_2
+    382                  }
+    383                  else
+    384                  {
+    385                      /* Exit critical region */
+    386                      CRITICAL_END ();
+   \                     ??atomTimerDelay_4:
+   \   00006D B6 ..        LD        A, S:?b2
+   \   00006F B7 ..        LD        S:?b0, A
+   \   000071 8A           PUSH      CC
+   \   000072 84           POP       A
+   \   000073 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000075 BA ..        OR        A, S:?b0
+   \   000077 88           PUSH      A
+   \   000078 86           POP       CC
+    387          
+    388                      /* Successful timer registration */
+    389                      status = ATOM_OK;
+   \   000079 3F ..        CLR       S:?b8
+    390          
+    391                      /* Current thread should now block, schedule in another */
+    392                      atomSched (FALSE);
+   \   00007B 4F           CLR       A
+   \   00007C CD ....      CALL      L:atomSched
+    393                  }
+    394              }
+    395          
+    396              return (status);
+   \                     ??atomTimerDelay_2:
+   \   00007F B6 ..        LD        A, S:?b8
+   \   000081 5B 0C        ADD       SP, #0xc
+   \   000083 CC ....      JP        L:?epilogue_l2
+    397          }
+    398          
+    399          
+    400          /**
+    401           * \b atomTimerCallbacks
+    402           *
+    403           * This is an internal function not for use by application code.
+    404           *
+    405           * Find any callbacks that are due and call them up.
+    406           *
+    407           * @return None
+    408           */
+
+   \                                 In section .near_func.text, align 1
+    409          static void atomTimerCallbacks (void)
+    410          {
+   \                     atomTimerCallbacks:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+    411              ATOM_TIMER *prev_ptr, *next_ptr, *saved_next_ptr;
+    412              ATOM_TIMER *callback_list_tail = NULL, *callback_list_head = NULL;
+   \   000006 3F ..        CLR       S:?b1
+   \   000008 3F ..        CLR       S:?b0
+   \   00000A 3F ..        CLR       S:?b9
+   \   00000C 3F ..        CLR       S:?b8
+    413          
+    414              /*
+    415               * Walk the list decrementing each timer's remaining ticks count and
+    416               * looking for due callbacks.
+    417               */
+    418              prev_ptr = next_ptr = timer_queue;
+   \   00000E CE ....      LDW       X, L:timer_queue
+   \   000011 9093         LDW       Y, X
+   \   000013 BF ..        LDW       S:?w5, X
+   \   000015 20 06        JRA       L:??atomTimerCallbacks_0
+    419              while (next_ptr)
+    420              {
+    421                  /* Save the next timer in the list (we adjust next_ptr for callbacks) */
+    422                  saved_next_ptr = next_ptr->next_timer;
+    423           
+    424                  /* Is this entry due? */
+    425                  if (--(next_ptr->cb_ticks) == 0)
+    426                  {
+    427                      /* Remove the entry from the timer list */
+    428                      if (next_ptr == timer_queue)
+    429                      {
+    430                          /* We're removing the list head */
+    431                          timer_queue = next_ptr->next_timer;
+    432                      }
+    433                      else
+    434                      {
+    435                          /* We're removing a mid or tail timer */
+    436                          prev_ptr->next_timer = next_ptr->next_timer;
+    437                      }
+    438          
+    439                      /*
+    440                       * Add this timer to the list of callbacks to run later when
+    441                       * we've finished walking the list (we shouldn't call callbacks
+    442                       * now in case they want to register new timers and hence walk
+    443                       * the timer list.
+    444                       *
+    445                       * We reuse the ATOM_TIMER structure's next_ptr to maintain the
+    446                       * callback list.
+    447                       */
+    448                      if (callback_list_head == NULL)
+    449                      {
+    450                          /* First callback request in the list */ 
+    451                          callback_list_head = callback_list_tail = next_ptr;
+    452                      }
+    453                      else
+    454                      {
+    455                          /* Add callback request to the list tail */
+    456                          callback_list_tail->next_timer = next_ptr;
+    457                          callback_list_tail = callback_list_tail->next_timer;
+    458                      }
+    459          
+    460                      /* Mark this timer as the end of the callback list */
+    461                      next_ptr->next_timer = NULL;
+    462          
+    463                      /* Do not update prev_ptr, we have just removed this one */
+    464          
+    465                  }
+    466          
+    467                  /* Entry is not due, leave it in there with its count decremented */
+    468                  else
+    469                  {
+    470                      /*
+    471                       * Update prev_ptr to this entry. We will need it if we want
+    472                       * to remove a mid or tail timer.
+    473                       */
+    474                      prev_ptr = next_ptr;
+   \                     ??atomTimerCallbacks_1:
+   \   000017 90BF ..      LDW       S:?w5, Y
+    475                  }
+    476          
+    477                  /* Move on to the next in the list */
+    478                  next_ptr = saved_next_ptr;
+   \                     ??atomTimerCallbacks_2:
+   \   00001A 90BE ..      LDW       Y, S:?w6
+   \                     ??atomTimerCallbacks_0:
+   \   00001D 905D         TNZW      Y
+   \   00001F 27 5E        JREQ      L:??atomTimerCallbacks_3
+   \   000021 93           LDW       X, Y
+   \   000022 1C 0008      ADDW      X, #0x8
+   \   000025 BF ..        LDW       S:?w1, X
+   \   000027 92CE ..      LDW       X, [S:?w1.w]
+   \   00002A BF ..        LDW       S:?w6, X
+   \   00002C 93           LDW       X, Y
+   \   00002D 1C 0004      ADDW      X, #0x4
+   \   000030 BF ..        LDW       S:?w7, X
+   \   000032 CD ....      CALL      L:?load32_l1_0x
+   \   000035 CD ....      CALL      L:?dec32_l1_l1
+   \   000038 BE ..        LDW       X, S:?w7
+   \   00003A CD ....      CALL      L:?load32_0x_l1
+   \   00003D BE ..        LDW       X, S:?w2
+   \   00003F 26 02        JRNE      L:??atomTimerCallbacks_4
+   \   000041 BE ..        LDW       X, S:?w3
+   \                     ??atomTimerCallbacks_4:
+   \   000043 26 D2        JRNE      L:??atomTimerCallbacks_1
+   \   000045 92CE ..      LDW       X, [S:?w1.w]
+   \   000048 BF ..        LDW       S:?w2, X
+   \   00004A 90C3 ....    CPW       Y, L:timer_queue
+   \   00004E 26 05        JRNE      L:??atomTimerCallbacks_5
+   \   000050 CF ....      LDW       L:timer_queue, X
+   \   000053 20 0D        JRA       L:??atomTimerCallbacks_6
+   \                     ??atomTimerCallbacks_5:
+   \   000055 9089         PUSHW     Y
+   \   000057 BE ..        LDW       X, S:?w5
+   \   000059 90BE ..      LDW       Y, S:?w2
+   \   00005C 1C 0008      ADDW      X, #0x8
+   \   00005F FF           LDW       (X), Y
+   \   000060 9085         POPW      Y
+   \                     ??atomTimerCallbacks_6:
+   \   000062 BE ..        LDW       X, S:?w4
+   \   000064 26 08        JRNE      L:??atomTimerCallbacks_7
+   \   000066 90BF ..      LDW       S:?w0, Y
+   \   000069 CD ....      CALL      L:?mov_w4_w0
+   \   00006C 20 09        JRA       L:??atomTimerCallbacks_8
+   \                     ??atomTimerCallbacks_7:
+   \   00006E BE ..        LDW       X, S:?w0
+   \   000070 1C 0008      ADDW      X, #0x8
+   \   000073 FF           LDW       (X), Y
+   \   000074 FE           LDW       X, (X)
+   \   000075 BF ..        LDW       S:?w0, X
+   \                     ??atomTimerCallbacks_8:
+   \   000077 5F           CLRW      X
+   \   000078 90BE ..      LDW       Y, S:?w1
+   \   00007B 90FF         LDW       (Y), X
+   \   00007D 20 9B        JRA       L:??atomTimerCallbacks_2
+    479              }
+    480          
+    481              /*
+    482               * Check if any callbacks were due. We call them after we walk the list
+    483               * in case they want to register new timers (and hence walk the list).
+    484               */
+    485              if (callback_list_head)
+   \                     ??atomTimerCallbacks_3:
+   \   00007F BE ..        LDW       X, S:?w4
+   \   000081 27 21        JREQ      L:??atomTimerCallbacks_9
+    486              {
+    487                  /* Walk the callback list */
+    488                  next_ptr = callback_list_head;
+   \   000083 90BE ..      LDW       Y, S:?w4
+   \   000086 20 18        JRA       L:??atomTimerCallbacks_10
+    489                  while (next_ptr)
+    490                  {
+    491                      /*
+    492                       *  Save the next timer in the list (in case the callback
+    493                       *  modifies the list by registering again.
+    494                       */
+    495                      saved_next_ptr = next_ptr->next_timer;
+   \                     ??atomTimerCallbacks_11:
+   \   000088 93           LDW       X, Y
+   \   000089 1C 0008      ADDW      X, #0x8
+   \   00008C FE           LDW       X, (X)
+   \   00008D BF ..        LDW       S:?w6, X
+    496          
+    497                      /* Call the registered callback */
+    498                      if (next_ptr->cb_func)
+   \   00008F 93           LDW       X, Y
+   \   000090 FE           LDW       X, (X)
+   \   000091 BF ..        LDW       S:?w0, X
+   \   000093 27 08        JREQ      L:??atomTimerCallbacks_12
+    499                      {
+    500                          next_ptr->cb_func (next_ptr->cb_data);
+   \   000095 93           LDW       X, Y
+   \   000096 1C 0002      ADDW      X, #0x2
+   \   000099 FE           LDW       X, (X)
+   \   00009A 92CD ..      CALL      [S:?w0.w]
+    501                      }
+    502          
+    503                      /* Move on to the next callback in the list */
+    504                      next_ptr = saved_next_ptr;
+   \                     ??atomTimerCallbacks_12:
+   \   00009D 90BE ..      LDW       Y, S:?w6
+    505                  }
+   \                     ??atomTimerCallbacks_10:
+   \   0000A0 905D         TNZW      Y
+   \   0000A2 26 E4        JRNE      L:??atomTimerCallbacks_11
+    506              }
+    507          
+    508          }
+   \                     ??atomTimerCallbacks_9:
+   \   0000A4 CC ....      JP        L:?epilogue_l2_l3
+    509          
+    510          
+    511          /**
+    512           * \b atomTimerDelayCallback
+    513           *
+    514           * This is an internal function not for use by application code.
+    515           *
+    516           * Callback for atomTimerDelay() calls. Wakes up the sleeping threads.
+    517           *
+    518           * @param[in] cb_data Callback parameter (DELAY_TIMER ptr for sleeping thread)
+    519           *
+    520           * @return None
+    521           */
+
+   \                                 In section .near_func.text, align 1
+    522          static void atomTimerDelayCallback (POINTER cb_data)
+    523          {
+   \                     atomTimerDelayCallback:
+   \   000000 3B ....      PUSH      S:?b8
+    524              DELAY_TIMER *timer_data_ptr;
+    525              CRITICAL_STORE;
+    526          
+    527              /* Get the DELAY_TIMER structure pointer */
+    528              timer_data_ptr = (DELAY_TIMER *)cb_data;
+    529          
+    530              /* Check parameter is valid */
+    531              if (timer_data_ptr)
+   \   000003 5D           TNZW      X
+   \   000004 27 1C        JREQ      L:??atomTimerDelayCallback_0
+    532              {
+    533                  /* Enter critical region */
+    534                  CRITICAL_START ();
+   \   000006 8A           PUSH      CC
+   \   000007 84           POP       A
+   \   000008 A4 28        AND       A, #0x28
+   \   00000A B7 ..        LD        S:?b8, A
+   \   00000C 9B           SIM
+    535          
+    536                  /* Put the thread on the ready queue */
+    537                  (void)tcbEnqueuePriority (&tcbReadyQ, timer_data_ptr->tcb_ptr);
+   \   00000D FE           LDW       X, (X)
+   \   00000E 9093         LDW       Y, X
+   \   000010 AE ....      LDW       X, #tcbReadyQ
+   \   000013 CD ....      CALL      L:tcbEnqueuePriority
+    538          
+    539                  /* Exit critical region */
+    540                  CRITICAL_END ();
+   \   000016 B6 ..        LD        A, S:?b8
+   \   000018 B7 ..        LD        S:?b0, A
+   \   00001A 8A           PUSH      CC
+   \   00001B 84           POP       A
+   \   00001C A4 D7        AND       A, #0xffffffffffffffd7
+   \   00001E BA ..        OR        A, S:?b0
+   \   000020 88           PUSH      A
+   \   000021 86           POP       CC
+    541          
+    542                  /**
+    543                   * Don't call the scheduler yet. The ISR exit routine will do this
+    544                   * in case there are other callbacks to be made, which may also make
+    545                   * threads ready.
+    546                   */
+    547              }
+    548          }
+   \                     ??atomTimerDelayCallback_0:
+   \   000022 32 ....      POP       S:?b8
+   \   000025 81           RET
+    549          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       6  atomTimeGet
+       6  atomTimeSet
+     167  atomTimerCallbacks
+      82  atomTimerCancel
+     134  atomTimerDelay
+      38  atomTimerDelayCallback
+      79  atomTimerRegister
+      24  atomTimerTick
+       4  system_ticks
+       2  timer_queue
+
+ 
+   6 bytes in section .near.bss
+ 536 bytes in section .near_func.text
+ 
+ 536 bytes of CODE memory
+   6 bytes of DATA memory
+
+Errors: none
+Warnings: 1

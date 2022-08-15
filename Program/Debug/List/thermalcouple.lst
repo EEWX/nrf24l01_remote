@@ -1,0 +1,288 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 29/Dec/2019  20:06:51
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\User\thermalcouple.c
+#    Command line =  
+#        "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\User\thermalcouple.c" -e -Ol --no_cse --no_unroll --no_inline
+#        --no_code_motion --no_tbaa --no_cross_call --debug --code_model small
+#        --data_model medium -o "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\List"
+#        -I "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\AtomOS1.3\kernel\" -I "C:\Users\Administrator\Desktop\My
+#        Design\JBC AtomOS\AtomOS1.3\ports\stm8\" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\" --vregs 16
+#    List file    =  
+#        C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\Debug\List\thermalcouple.lst
+#    Object file  =  
+#        C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\Debug\Obj\thermalcouple.o
+#
+###############################################################################
+
+C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\thermalcouple.c
+      1          #include "stm8l15x.h"
+      2          #include "thermalcouple.h"
+      3          
+      4          
+      5          
+      6          //---------ThermalCoupleTypeKTable[0] --> 0C
+      7          //---------ThermalCoupleTypeKTable[1] --> 10C
+      8          //---------ThermalCoupleTypeKTable[10] --> 100C
+
+   \                                 In section .near.rodata, align 1
+      9          const uint16_t ThermalCoupleTypeKTable[51]=
+   \                     ThermalCoupleTypeKTable:
+   \   000000 0000 018D    DC16 0, 397, 798, 1203, 1612, 2023, 2436, 2851, 3267, 3682, 4096, 4509
+   \          031E 04B3   
+   \   000018 1338 14D0    DC16 4920, 5328, 5735, 6138, 6540, 6941, 7340, 7739, 8138, 8539, 8940
+   \          1667 17FA   
+   \   00002E 247F 2613    DC16 9343, 9747, 10153, 10561, 10971, 11382, 11795, 12209, 12624, 13040
+   \          27A9 2941   
+   \   000042 3491 3632    DC16 13457, 13874, 14293, 14713, 15133, 15554, 15975, 16397, 16820
+   \          37D5 3979   
+   \   000054 435B 4503    DC16 17243, 17667, 18091, 18516, 18941, 19366, 19792, 20218, 20644
+   \          46AB 4854   
+     10          {
+     11          0,
+     12          397,            //397uV
+     13          798,
+     14          1203,
+     15          1612,
+     16          2023,
+     17          2436,
+     18          2851,
+     19          3267,
+     20          3682,
+     21          4096,
+     22          4509,
+     23          4920,
+     24          5328,
+     25          5735,
+     26          6138,
+     27          6540,
+     28          6941,
+     29          7340,
+     30          7739,
+     31          8138,
+     32          8539,
+     33          8940,
+     34          9343,
+     35          9747,
+     36          10153,          //10.153mV
+     37          10561,
+     38          10971,
+     39          11382,
+     40          11795,
+     41          12209,
+     42          12624,
+     43          13040,
+     44          13457,
+     45          13874,
+     46          14293,
+     47          14713,
+     48          15133,
+     49          15554,
+     50          15975,
+     51          16397,
+     52          16820,
+     53          17243,
+     54          17667,
+     55          18091,
+     56          18516,
+     57          18941,
+     58          19366,
+     59          19792,
+     60          20218,
+     61          20644
+     62          };
+     63          //-------------------------volt:in uV---------------
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     64          float THERMALCOUPLE_VoltageToTemperature(float thermal_volt)
+     65          {
+   \                     THERMALCOUPLE_VoltageToTemperature:
+   \   000000 CD ....      CALL      L:?push_l3
+   \   000003 3B ....      PUSH      S:?b8
+   \   000006 52 08        SUB       SP, #0x8
+     66              uint8_t thermal_index;
+     67              float table_position = 0;
+   \   000008 AE 0000      LDW       X, #0x0
+   \   00000B 1F 01        LDW       (0x1,SP), X
+   \   00000D AE 0000      LDW       X, #0x0
+   \   000010 1F 03        LDW       (0x3,SP), X
+     68              float thermal_percent = 0;
+   \   000012 AE 0000      LDW       X, #0x0
+   \   000015 1F 05        LDW       (0x5,SP), X
+   \   000017 AE 0000      LDW       X, #0x0
+   \   00001A 1F 07        LDW       (0x7,SP), X
+     69              float thermal_volt_temp = thermal_volt * 1000000;
+   \   00001C CD ....      CALL      L:?fmul32_l0_l0_dc32
+   \   00001F 49742400     DC32      0x49742400
+   \   000023 CD ....      CALL      L:?mov_l3_l0
+     70              for(thermal_index=0;thermal_index<51;thermal_index++)
+   \   000026 3F ..        CLR       S:?b8
+   \   000028 20 06        JRA       L:??THERMALCOUPLE_VoltageToTemperature_0
+   \                     ??THERMALCOUPLE_VoltageToTemperature_1:
+   \   00002A B6 ..        LD        A, S:?b8
+   \   00002C AB 01        ADD       A, #0x1
+   \   00002E B7 ..        LD        S:?b8, A
+   \                     ??THERMALCOUPLE_VoltageToTemperature_0:
+   \   000030 B6 ..        LD        A, S:?b8
+   \   000032 A1 33        CP        A, #0x33
+   \   000034 25 03        JRC       ??lb_0
+   \   000036 CC ....      JP        L:??THERMALCOUPLE_VoltageToTemperature_2
+     71              {
+     72                  if(thermal_volt_temp == ThermalCoupleTypeKTable[thermal_index])
+   \                     ??lb_0:
+   \   000039 5F           CLRW      X
+   \   00003A B6 ..        LD        A, S:?b8
+   \   00003C 97           LD        XL, A
+   \   00003D 58           SLLW      X
+   \   00003E DE ....      LDW       X, (L:ThermalCoupleTypeKTable,X)
+   \   000041 CD ....      CALL      L:?fcastf32u16_l0_x
+   \   000044 CD ....      CALL      L:?mov_l1_l3
+   \   000047 CD ....      CALL      L:?fcmpeq32_c_l0_l1
+   \   00004A 26 0D        JRNE      L:??THERMALCOUPLE_VoltageToTemperature_3
+     73                  {
+     74                      table_position = thermal_index;
+   \   00004C 5F           CLRW      X
+   \   00004D B6 ..        LD        A, S:?b8
+   \   00004F 97           LD        XL, A
+   \   000050 CD ....      CALL      L:?fcastf32u16_l0_x
+   \   000053 CD ....      CALL      L:?load32_dbsp_l0
+   \   000056 01           DC8       0x1
+     75                      break;
+   \   000057 20 7C        JRA       L:??THERMALCOUPLE_VoltageToTemperature_2
+     76                  }
+     77                  else if(thermal_volt_temp<ThermalCoupleTypeKTable[thermal_index+1] && thermal_volt_temp>ThermalCoupleTypeKTable[thermal_index])
+   \                     ??THERMALCOUPLE_VoltageToTemperature_3:
+   \   000059 5F           CLRW      X
+   \   00005A B6 ..        LD        A, S:?b8
+   \   00005C 97           LD        XL, A
+   \   00005D 58           SLLW      X
+   \   00005E 1C ....      ADDW      X, #ThermalCoupleTypeKTable + 2
+   \   000061 FE           LDW       X, (X)
+   \   000062 CD ....      CALL      L:?fcastf32u16_l0_x
+   \   000065 CD ....      CALL      L:?mov_l1_l0
+   \   000068 CD ....      CALL      L:?mov_l0_l3
+   \   00006B CD ....      CALL      L:?fcmplt32_c_l0_l1
+   \   00006E 24 BA        JRNC      L:??THERMALCOUPLE_VoltageToTemperature_1
+   \   000070 5F           CLRW      X
+   \   000071 B6 ..        LD        A, S:?b8
+   \   000073 97           LD        XL, A
+   \   000074 58           SLLW      X
+   \   000075 DE ....      LDW       X, (L:ThermalCoupleTypeKTable,X)
+   \   000078 CD ....      CALL      L:?fcastf32u16_l0_x
+   \   00007B CD ....      CALL      L:?mov_l1_l3
+   \   00007E CD ....      CALL      L:?fcmplt32_c_l0_l1
+   \   000081 24 A7        JRNC      L:??THERMALCOUPLE_VoltageToTemperature_1
+     78                  {
+     79                      thermal_percent = ((thermal_volt_temp - ThermalCoupleTypeKTable[thermal_index]))/(ThermalCoupleTypeKTable[thermal_index+1] - ThermalCoupleTypeKTable[thermal_index]);
+   \   000083 5F           CLRW      X
+   \   000084 B6 ..        LD        A, S:?b8
+   \   000086 97           LD        XL, A
+   \   000087 58           SLLW      X
+   \   000088 1C ....      ADDW      X, #ThermalCoupleTypeKTable + 2
+   \   00008B FE           LDW       X, (X)
+   \   00008C 905F         CLRW      Y
+   \   00008E B6 ..        LD        A, S:?b8
+   \   000090 9097         LD        YL, A
+   \   000092 9058         SLLW      Y
+   \   000094 90DE ....    LDW       Y, (L:ThermalCoupleTypeKTable,Y)
+   \   000098 90BF ..      LDW       S:?w0, Y
+   \   00009B 72B0 ....    SUBW      X, S:?w0
+   \   00009F CD ....      CALL      L:?fcastf32u16_l0_x
+   \   0000A2 CD ....      CALL      L:?push_l0
+   \   0000A5 5F           CLRW      X
+   \   0000A6 B6 ..        LD        A, S:?b8
+   \   0000A8 97           LD        XL, A
+   \   0000A9 58           SLLW      X
+   \   0000AA DE ....      LDW       X, (L:ThermalCoupleTypeKTable,X)
+   \   0000AD CD ....      CALL      L:?fcastf32u16_l0_x
+   \   0000B0 CD ....      CALL      L:?mov_l1_l0
+   \   0000B3 CD ....      CALL      L:?mov_l0_l3
+   \   0000B6 CD ....      CALL      L:?fsub32_l0_l0_l1
+   \   0000B9 CD ....      CALL      L:?pop_l1
+   \   0000BC CD ....      CALL      L:?fdiv32_l0_l0_l1
+   \   0000BF CD ....      CALL      L:?load32_dbsp_l0
+   \   0000C2 05           DC8       0x5
+     80                      table_position = thermal_index+thermal_percent;
+   \   0000C3 5F           CLRW      X
+   \   0000C4 B6 ..        LD        A, S:?b8
+   \   0000C6 97           LD        XL, A
+   \   0000C7 CD ....      CALL      L:?fcastf32u16_l0_x
+   \   0000CA CD ....      CALL      L:?load32_l1_dbsp
+   \   0000CD 05           DC8       0x5
+   \   0000CE CD ....      CALL      L:?fadd32_l0_l0_l1
+   \   0000D1 CD ....      CALL      L:?load32_dbsp_l0
+   \   0000D4 01           DC8       0x1
+     81                      break;
+     82                  }
+     83              }
+     84              return(table_position*10);
+   \                     ??THERMALCOUPLE_VoltageToTemperature_2:
+   \   0000D5 CD ....      CALL      L:?load32_l0_dbsp
+   \   0000D8 01           DC8       0x1
+   \   0000D9 CD ....      CALL      L:?fmul32_l0_l0_dc32
+   \   0000DC 41200000     DC32      0x41200000
+   \   0000E0 5B 08        ADD       SP, #0x8
+   \   0000E2 32 ....      POP       S:?b8
+   \   0000E5 CD ....      CALL      L:?pop_l3
+   \   0000E8 81           RET
+     85          }
+     86          
+     87          //---------------origin_volt in V --------------
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+     88          float THERMALCOUPLE_VoltageRecovery(float origin_volt)
+     89          {
+     90            return((origin_volt+DEFAULT_THERMALCOUPLE_OFFSET)/DEFAULT_THERMALCOUPLE_GAIN);
+   \                     THERMALCOUPLE_VoltageRecovery:
+   \   000000 CD ....      CALL      L:?fadd32_l0_l0_dc32
+   \   000003 3B102DE0     DC32      0x3b102de0
+   \   000007 CD ....      CALL      L:?fdiv32_l0_l0_dc32
+   \   00000A 4318A148     DC32      0x4318a148
+   \   00000E 81           RET
+     91          }
+     92          
+
+   \                                 In section .near_func.text, align 1
+     93          float THERMALCOUPLE_Update(float volt)
+     94          {
+     95            float recovered_volt;
+     96            recovered_volt = THERMALCOUPLE_VoltageRecovery(volt);
+   \                     THERMALCOUPLE_Update:
+   \   000000 CD ....      CALL      L:THERMALCOUPLE_VoltageRecovery
+     97            return(THERMALCOUPLE_VoltageToTemperature(recovered_volt));
+   \   000003 CC ....      JP        L:THERMALCOUPLE_VoltageToTemperature
+     98          }
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       6  THERMALCOUPLE_Update
+      15  THERMALCOUPLE_VoltageRecovery
+     233  THERMALCOUPLE_VoltageToTemperature
+     102  ThermalCoupleTypeKTable
+
+ 
+ 102 bytes in section .near.rodata
+ 254 bytes in section .near_func.text
+ 
+ 254 bytes of CODE  memory
+ 102 bytes of CONST memory
+
+Errors: none
+Warnings: none

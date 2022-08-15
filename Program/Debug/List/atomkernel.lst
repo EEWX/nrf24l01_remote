@@ -1,0 +1,1604 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 17/Jun/2020  23:55:16
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomkernel.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomkernel.c"
+#        -e -Om --no_unroll --no_inline --no_tbaa --no_cross_call --debug
+#        --code_model small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\atomkernel.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\atomkernel.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\atomkernel.c
+      1          /*
+      2           * Copyright (c) 2010, Kelvin Lawson. All rights reserved.
+      3           *
+      4           * Redistribution and use in source and binary forms, with or without
+      5           * modification, are permitted provided that the following conditions
+      6           * are met:
+      7           *
+      8           * 1. Redistributions of source code must retain the above copyright
+      9           *    notice, this list of conditions and the following disclaimer.
+     10           * 2. Redistributions in binary form must reproduce the above copyright
+     11           *    notice, this list of conditions and the following disclaimer in the
+     12           *    documentation and/or other materials provided with the distribution.
+     13           * 3. No personal names or organizations' names associated with the
+     14           *    Atomthreads project may be used to endorse or promote products
+     15           *    derived from this software without specific prior written permission.
+     16           *
+     17           * THIS SOFTWARE IS PROVIDED BY THE ATOMTHREADS PROJECT AND CONTRIBUTORS
+     18           * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+     19           * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     20           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE
+     21           * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     22           * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     23           * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     24           * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     25           * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     26           * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     27           * POSSIBILITY OF SUCH DAMAGE.
+     28           */
+     29          
+     30          
+     31          /**
+     32           * \file
+     33           * Kernel library.
+     34           *
+     35           *
+     36           * This module implements the core kernel functionality of managing threads,
+     37           * context-switching and interrupt handlers. It also contains functions for
+     38           * managing queues of TCBs (task control blocks) which are used not only for
+     39           * the queue of ready threads, but also by other OS primitives (such as
+     40           * semaphores) for generically managing lists of TCBs.
+     41           *
+     42           * Core kernel functionality such as managing the queue of ready threads and
+     43           * how context-switch decisions are made is described within the code. However
+     44           * a quick summary is as follows:
+     45           *
+     46           * There is a ready queue of threads. There must always be at least one thread
+     47           * ready-to-run. If no application threads are ready, the internal kernel idle
+     48           * thread will be run. This ensures that there is a thread to run at all
+     49           * times.
+     50           *
+     51           * Application code creates threads using atomThreadCreate(). These threads
+     52           * are added to the ready queue and eventually run when it is their turn
+     53           * (based on priority). When threads are currently-running they are taken off
+     54           * the ready queue. Threads continue to run until:
+     55           * \li They schedule themselves out by calling an OS primitive which blocks,
+     56           *     such as a timer delay or blocking on a semaphore. At this point they
+     57           *     are placed on the queue of the OS primitive in which they are blocking
+     58           *     (for example a timer delay or semaphore).
+     59           * \li They are preempted by a higher priority thread. This could happen at
+     60           *     any time if a kernel call from the currently-running thread or from an
+     61           *     interrupt handler makes a higher priority thread ready-to-run.
+     62           *     Generally this will occur immediately, and while the previously-running
+     63           *     thread is still considered ready-to-run, it is no longer the
+     64           *     currently-running thread so goes back on to the ready queue.
+     65           * \li They are scheduled out after a timeslice when another thread of the
+     66           *     same priority is also ready. This happens on a timer tick, and ensures
+     67           *     that threads of the same priority share timeslices. In this case the
+     68           *     previously-running thread is still considered ready-to-run so is placed
+     69           *     back on to the ready queue.
+     70           *
+     71           * Thread scheduling decisions are made by atomSched(). This is called at
+     72           * several times, but should never be called by application code directly:
+     73           * \li After interrupt handlers: The scheduler is called after every
+     74           *     interrupt handler has completed. This allows for any threads which
+     75           *     have been made ready-to-run by the interrupt handler to be scheduled
+     76           *     in. For example if an interrupt handler posts a semaphore which wakes
+     77           *     up a thread of higher priority than the currently-running thread, then
+     78           *     the end of interrupt handler reschedule will schedule that thread in.
+     79           * \li On timer ticks: The timer tick is implemented as an interrupt handler
+     80           *     so the end of interrupt call to the scheduler is made as normal, except
+     81           *     that in this case round-robin rescheduling is allowed (where threads
+     82           *     of the same priority are given a timeslice each in round-robin
+     83           *     fashion). This must only occur on timer ticks when the system tick
+     84           *     count is incremented.
+     85           * \li After any OS call changes ready states: Any OS primitives which change
+     86           *     the running state of a thread will call the scheduler to ensure that
+     87           *     the change of thread state is noted. For example if a new thread is
+     88           *     created using atomThreadCreate(), it will internally call the scheduler
+     89           *     in case the newly-created thread is higher priority than the
+     90           *     currently-running thread. Similarly OS primitives such as semaphores
+     91           *     often make changes to a thread's running state. If a thread is going to
+     92           *     sleep blocking on a semaphore then the scheduler will be run to ensure
+     93           *     that some other thread is scheduled in in its place. If a thread is
+     94           *     woken by a semaphore post, the scheduler will also be called in case
+     95           *     that thread should now be scheduled in (note that when semaphores are
+     96           *     posted from an interrupt handler this is deferred to the end of
+     97           *     interrupt scheduler call).
+     98           *
+     99           * When a thread reschedule needs to take place, the scheduler calls out to
+    100           * the architecture-specific port to perform the context-switch, using
+    101           * archContextSwitch() which must be provided by each architecture port. This
+    102           * function carries out the low-level saving and restoring of registers
+    103           * appropriate for the architecture. The thread being switched out must have
+    104           * a set of CPU registers saved, and the thread being scheduled in has a set
+    105           * of CPU registers restored (which were previously saved). In this fashion
+    106           * threads are rescheduled with the CPU registers in exactly the same state as
+    107           * when the thread was scheduled out.
+    108          
+    109           * New threads which have never been scheduled in have a pre-formatted stack
+    110           * area containing a set of CPU register values ready for restoring that
+    111           * appears exactly as if the thread had been previously scheduled out. In
+    112           * other words, the scheduler need not know when it restores registers to
+    113           * switch a thread in whether it has previously run or if it has never been
+    114           * run since the thread was created. The context-save area is formatted in
+    115           * exactly the same manner.
+    116           *
+    117           *
+    118           * \b Functions contained in this module:\n
+    119           *
+    120           * \b Application-callable initialisation functions: \n
+    121           *
+    122           * \li atomOSInit(): Initialises the operating system.
+    123           * \li atomOSStart(): Starts the OS running (with the highest priority thread).
+    124           *
+    125           * \b Application-callable general functions: \n
+    126           *
+    127           * \li atomThreadCreate(): Thread creation API.
+    128           * \li atomCurrentContext(): Used by kernel and application code to check
+    129           *     whether the thread is currently running at thread or interrupt context.
+    130           *     This is very useful for implementing safety checks and preventing
+    131           *     interrupt handlers from making kernel calls that would block.
+    132           * \li atomIntEnter() / atomIntExit(): Must be called by any interrupt handlers.
+    133           *
+    134           * \b Internal kernel functions: \n
+    135           *
+    136           * \li atomSched(): Core scheduler.
+    137           * \li atomThreadSwitch(): Context-switch routine.
+    138           * \li atomIdleThread(): Simple thread to be run when no other threads ready.
+    139           * \li tcbEnqueuePriority(): Enqueues TCBs (task control blocks) on lists.
+    140           * \li tcbDequeueHead(): Dequeues the head of a TCB list.
+    141           * \li tcbDequeueEntry(): Dequeues a particular entry from a TCB list.
+    142           * \li tcbDequeuePriority(): Dequeues an entry from a TCB list using priority.
+    143           *
+    144           */
+    145          
+    146          
+    147          #include "atom.h"
+    148          
+    149          
+    150          /* Global data */
+    151          
+    152          /**
+    153           * This is the head of the queue of threads that are ready to run. It is
+    154           * ordered by priority, with the higher priority threads coming first. Where
+    155           * there are multiple threads of the same priority, the TCB (task control
+    156           * block) pointers are FIFO-ordered.
+    157           *
+    158           * Dequeuing the head is a fast operation because the list is ordered.
+    159           * Enqueuing may have to walk up to the end of the list. This means that
+    160           * context-switch times depend on the number of threads on the ready queue,
+    161           * but efficient use is made of available RAM on tiny systems by avoiding
+    162           * priority tables etc. This scheme can be easily swapped out for other
+    163           * scheduler schemes by replacing the TCB enqueue and dequeue functions.
+    164           *
+    165           * Once a thread is scheduled in, it is not present on the ready queue or any
+    166           * other kernel queue while it is running. When scheduled out it will be
+    167           * either placed back on the ready queue (if still ready), or will be suspended
+    168           * on some OS primitive if no longer ready (e.g. on the suspended TCB queue
+    169           * for a semaphore, or in the timer list if suspended on a timer delay).
+    170           */
+
+   \                                 In section .near.bss, align 1
+    171          ATOM_TCB *tcbReadyQ = NULL;
+   \                     tcbReadyQ:
+   \   000000              DS8 2
+    172          
+    173          /** Set to TRUE when OS is started and running threads */
+
+   \                                 In section .near.bss, align 1
+    174          uint8_t atomOSStarted = FALSE;
+   \                     atomOSStarted:
+   \   000000              DS8 1
+    175          
+    176          
+    177          /* Local data */
+    178          
+    179          /** This is a pointer to the TCB for the currently-running thread */
+
+   \                                 In section .near.bss, align 1
+    180          static ATOM_TCB *curr_tcb = NULL;
+   \                     curr_tcb:
+   \   000000              DS8 2
+    181          
+    182          /** Storage for the idle thread's TCB */
+
+   \                                 In section .near.bss, align 1
+    183          static ATOM_TCB idle_tcb;
+   \                     idle_tcb:
+   \   000000              DS8 18
+    184          
+    185          /* Number of nested interrupts */
+
+   \                                 In section .near.bss, align 1
+    186          static int atomIntCnt = 0;
+   \                     atomIntCnt:
+   \   000000              DS8 2
+    187          
+    188          
+    189          /* Constants */
+    190          
+    191          /** Bytecode to fill thread stacks with for stack-checking purposes */
+    192          #define STACK_CHECK_BYTE    0x5A
+    193          
+    194          
+    195          /* Forward declarations */
+    196          static void atomThreadSwitch(ATOM_TCB *old_tcb, ATOM_TCB *new_tcb);
+    197          static void atomIdleThread (uint32_t data);
+    198          
+    199          
+    200          /**
+    201           * \b atomSched
+    202           *
+    203           * This is an internal function not for use by application code.
+    204           *
+    205           * This is the main scheduler routine. It is called by the various OS
+    206           * library routines to check if any threads should be scheduled in now.
+    207           * If so, the context will be switched from the current thread to the
+    208           * new one.
+    209           *
+    210           * The scheduler is priority-based with round-robin performed on threads
+    211           * with the same priority. Round-robin is only performed on timer ticks
+    212           * however. During reschedules caused by an OS operation (e.g. after
+    213           * giving or taking a semaphore) we only allow the scheduling in of
+    214           * threads with higher priority than current priority. On timer ticks we
+    215           * also allow the scheduling of same-priority threads - in that case we
+    216           * schedule in the head of the ready list for that priority and put the
+    217           * current thread at the tail.
+    218           *
+    219           * @param[in] timer_tick Should be TRUE when called from the system tick
+    220           *
+    221           * @return None
+    222           */
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    223          void atomSched (uint8_t timer_tick)
+    224          {
+   \                     atomSched:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 3B ....      PUSH      S:?b10
+   \   000006 B7 ..        LD        S:?b1, A
+    225              CRITICAL_STORE;
+    226              ATOM_TCB *new_tcb = NULL;
+    227              int16_t lowest_pri;
+    228          
+    229              /**
+    230               * Check the OS has actually started. As long as the proper initialisation
+    231               * sequence is followed there should be no calls here until the OS is
+    232               * started, but we check to handle badly-behaved ports.
+    233               */
+    234              if (atomOSStarted == FALSE)
+   \   000008 C6 ....      LD        A, L:atomOSStarted
+   \   00000B 27 7F        JREQ      L:??atomSched_0
+    235              {
+    236                  /* Don't schedule anything in until the OS is started */
+    237                  return;
+    238              }
+    239          
+    240              /* Enter critical section */
+    241              CRITICAL_START ();
+   \   00000D 8A           PUSH      CC
+   \   00000E 84           POP       A
+   \   00000F A4 28        AND       A, #0x28
+   \   000011 B7 ..        LD        S:?b10, A
+   \   000013 9B           SIM
+    242          
+    243              /**
+    244               * If the current thread is going into suspension or is being
+    245               * terminated (run to completion), then unconditionally dequeue
+    246               * the next thread for execution.
+    247               */
+    248              if ((curr_tcb->suspended == TRUE) || (curr_tcb->terminated == TRUE))
+   \   000014 CE ....      LDW       X, L:curr_tcb
+   \   000017 1C 000D      ADDW      X, #0xd
+   \   00001A F6           LD        A, (X)
+   \   00001B 4A           DEC       A
+   \   00001C 27 0A        JREQ      L:??atomSched_1
+   \   00001E CE ....      LDW       X, L:curr_tcb
+   \   000021 1C 0011      ADDW      X, #0x11
+   \   000024 F6           LD        A, (X)
+   \   000025 4A           DEC       A
+   \   000026 26 13        JRNE      L:??atomSched_2
+    249              {
+    250                  /**
+    251                   * Dequeue the next ready to run thread. There will always be
+    252                   * at least the idle thread waiting. Note that this could
+    253                   * actually be the suspending thread if it was unsuspended
+    254                   * before the scheduler was called.
+    255                   */
+    256                  new_tcb = tcbDequeueHead (&tcbReadyQ);
+   \                     ??atomSched_1:
+   \   000028 AE ....      LDW       X, #tcbReadyQ
+   \   00002B CD ....      CALL      L:tcbDequeueHead
+   \   00002E BF ..        LDW       S:?w4, X
+    257          
+    258                  /**
+    259                   * Don't need to add the current thread to any queue because
+    260                   * it was suspended by another OS mechanism and will be
+    261                   * sitting on a suspend queue or similar within one of the OS
+    262                   * primitive libraries (e.g. semaphore).
+    263                   */
+    264          
+    265                  /* Switch to the new thread */
+    266                  atomThreadSwitch (curr_tcb, new_tcb);
+   \   000030 90BE ..      LDW       Y, S:?w4
+   \   000033 CE ....      LDW       X, L:curr_tcb
+   \   000036 CD ....      CALL      L:atomThreadSwitch
+   \   000039 20 45        JRA       L:??atomSched_3
+    267              }
+    268          
+    269              /**
+    270               * Otherwise the current thread is still ready, but check
+    271               * if any other threads are ready.
+    272               */
+    273              else
+    274              {
+    275                  /* Calculate which priority is allowed to be scheduled in */
+    276                  if (timer_tick == TRUE)
+   \                     ??atomSched_2:
+   \   00003B CE ....      LDW       X, L:curr_tcb
+   \   00003E 5C           INCW      X
+   \   00003F 5C           INCW      X
+   \   000040 F6           LD        A, (X)
+   \   000041 B7 ..        LD        S:?b0, A
+   \   000043 B6 ..        LD        A, S:?b1
+   \   000045 4A           DEC       A
+   \   000046 26 06        JRNE      L:??atomSched_4
+    277                  {
+    278                      /* Same priority or higher threads can preempt */
+    279                      lowest_pri = (int16_t)curr_tcb->priority;
+   \   000048 5F           CLRW      X
+   \   000049 B6 ..        LD        A, S:?b0
+   \   00004B 97           LD        XL, A
+   \   00004C 20 0F        JRA       L:??atomSched_5
+    280                  }
+    281                  else if (curr_tcb->priority > 0)
+   \                     ??atomSched_4:
+   \   00004E 3D ..        TNZ       S:?b0
+   \   000050 27 09        JREQ      L:??atomSched_6
+    282                  {
+    283                      /* Only higher priority threads can preempt, invalid for 0 (highest) */
+    284                      lowest_pri = (int16_t)(curr_tcb->priority - 1);
+   \   000052 5F           CLRW      X
+   \   000053 B6 ..        LD        A, S:?b0
+   \   000055 97           LD        XL, A
+   \   000056 1C FFFF      ADDW      X, #0xffffffffffffffff
+   \   000059 20 02        JRA       L:??atomSched_5
+    285                  }
+    286                  else
+    287                  {
+    288                      /**
+    289                       * Current priority is already highest (0), don't allow preempt by
+    290                       * threads of any priority because this is not a time-slice.
+    291                       */
+    292                      lowest_pri = -1;
+   \                     ??atomSched_6:
+   \   00005B 5F           CLRW      X
+   \   00005C 5A           DECW      X
+    293                  }
+    294          
+    295                  /* Check if a reschedule is allowed */
+    296                  if (lowest_pri >= 0)
+   \                     ??atomSched_5:
+   \   00005D A3 0000      CPW       X, #0x0
+   \   000060 2F 1E        JRSLT     L:??atomSched_3
+    297                  {
+    298                      /* Check for a thread at the given minimum priority level or higher */
+    299                      new_tcb = tcbDequeuePriority (&tcbReadyQ, (uint8_t)lowest_pri);
+   \   000062 9F           LD        A, XL
+   \   000063 AE ....      LDW       X, #tcbReadyQ
+   \   000066 CD ....      CALL      L:tcbDequeuePriority
+   \   000069 BF ..        LDW       S:?w4, X
+    300          
+    301                      /* If a thread was found, schedule it in */
+    302                      if (new_tcb)
+   \   00006B 27 13        JREQ      L:??atomSched_3
+    303                      {
+    304                          /* Add the current thread to the ready queue */
+    305                          (void)tcbEnqueuePriority (&tcbReadyQ, curr_tcb);
+   \   00006D 90CE ....    LDW       Y, L:curr_tcb
+   \   000071 AE ....      LDW       X, #tcbReadyQ
+   \   000074 CD ....      CALL      L:tcbEnqueuePriority
+    306          
+    307                          /* Switch to the new thread */
+    308                          atomThreadSwitch (curr_tcb, new_tcb);
+   \   000077 90BE ..      LDW       Y, S:?w4
+   \   00007A CE ....      LDW       X, L:curr_tcb
+   \   00007D CD ....      CALL      L:atomThreadSwitch
+    309                      }
+    310                  }
+    311              }
+    312          
+    313              /* Exit critical section */
+    314              CRITICAL_END ();
+   \                     ??atomSched_3:
+   \   000080 B6 ..        LD        A, S:?b10
+   \   000082 B7 ..        LD        S:?b0, A
+   \   000084 8A           PUSH      CC
+   \   000085 84           POP       A
+   \   000086 A4 D7        AND       A, #0xffffffffffffffd7
+   \   000088 BA ..        OR        A, S:?b0
+   \   00008A 88           PUSH      A
+   \   00008B 86           POP       CC
+    315          }
+   \                     ??atomSched_0:
+   \   00008C 32 ....      POP       S:?b10
+   \   00008F CC ....      JP        L:?epilogue_w4
+    316          
+    317          
+    318          /**
+    319           * \b atomThreadSwitch
+    320           *
+    321           * This is an internal function not for use by application code.
+    322           *
+    323           * The function is called by the scheduler to perform a context switch.
+    324           * Execution will switch to the new thread's context, therefore the
+    325           * function doesn't actually return until the old thread is scheduled
+    326           * back in.
+    327           *
+    328           * @param[in] old_tcb Pointer to TCB for thread being scheduled out
+    329           * @param[in] new_tcb Pointer to TCB for thread being scheduled in
+    330           *
+    331           * @return None
+    332           */
+
+   \                                 In section .near_func.text, align 1
+    333          static void atomThreadSwitch(ATOM_TCB *old_tcb, ATOM_TCB *new_tcb)
+    334          {
+   \                     atomThreadSwitch:
+   \   000000 BF ..        LDW       S:?w0, X
+    335              /**
+    336               * The context switch will shift execution to a different thread. The
+    337               * new thread is now ready to run so clear its suspend status in
+    338               * preparation for it waking up.
+    339               */
+    340              new_tcb->suspended = FALSE;
+   \   000002 4F           CLR       A
+   \   000003 93           LDW       X, Y
+   \   000004 1C 000D      ADDW      X, #0xd
+   \   000007 F7           LD        (X), A
+    341          
+    342              /**
+    343               * Check if the new thread is actually the current one, in which
+    344               * case we don't need to do any context switch. This can happen
+    345               * if a thread goes into suspend but is unsuspended again before
+    346               * it is fully scheduled out.
+    347               */
+    348              if (old_tcb != new_tcb)
+   \   000008 90BF ..      LDW       S:?w1, Y
+   \   00000B BE ..        LDW       X, S:?w0
+   \   00000D B3 ..        CPW       X, S:?w1
+   \   00000F 27 07        JREQ      L:??atomThreadSwitch_0
+    349              {
+    350                  /* Set the new currently-running thread pointer */
+    351                  curr_tcb = new_tcb;
+   \   000011 90CF ....    LDW       L:curr_tcb, Y
+    352          
+    353                  /* Call the architecture-specific context switch */
+    354                  archContextSwitch (old_tcb, new_tcb);
+   \   000015 CD ....      CALL      L:archContextSwitch
+    355              }
+    356          }
+   \                     ??atomThreadSwitch_0:
+   \   000018 81           RET
+    357          
+    358          
+    359          /**
+    360           * \b atomThreadCreate
+    361           *
+    362           * Creates and starts a new thread.
+    363           *
+    364           * Callers provide the ATOM_TCB structure storage, these are not obtained
+    365           * from an internal TCB free list.
+    366           *
+    367           * The function puts the new thread on the ready queue and calls the
+    368           * scheduler. If the priority is higher than the current priority, then the
+    369           * new thread may be scheduled in before the function returns.
+    370           *
+    371           * Optionally prefills the thread stack with a known value to enable stack
+    372           * usage checking (if the ATOM_STACK_CHECKING macro is defined and
+    373           * stack_check parameter is set to TRUE).
+    374           *
+    375           * @param[in] tcb_ptr Pointer to the thread's TCB storage
+    376           * @param[in] priority Priority of the thread (0 to 255)
+    377           * @param[in] entry_point Thread entry point
+    378           * @param[in] entry_param Parameter passed to thread entry point
+    379           * @param[in] stack_bottom Bottom of the stack area
+    380           * @param[in] stack_size Size of the stack area in bytes
+    381           * @param[in] stack_check TRUE to enable stack checking for this thread
+    382           *
+    383           * @retval ATOM_OK Success
+    384           * @retval ATOM_ERR_PARAM Bad parameters
+    385           * @retval ATOM_ERR_QUEUE Error putting the thread on the ready queue
+    386           */
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    387          uint8_t atomThreadCreate (ATOM_TCB *tcb_ptr, uint8_t priority, void (*entry_point)(uint32_t), uint32_t entry_param, void *stack_bottom, uint32_t stack_size, uint8_t stack_check)
+    388          {
+   \                     atomThreadCreate:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 BF ..        LDW       S:?w4, X
+   \   000008 B7 ..        LD        S:?b6, A
+   \   00000A CD ....      CALL      L:?mov_w5_w2
+    389              CRITICAL_STORE;
+    390              uint8_t status;
+    391              uint8_t *stack_top;
+    392          #ifdef ATOM_STACK_CHECKING
+    393          	int32_t count;
+    394          #endif
+    395          
+    396              if ((tcb_ptr == NULL) || (entry_point == NULL) || (stack_bottom == NULL)
+    397                  || (stack_size == 0))
+   \   00000D 5D           TNZW      X
+   \   00000E 27 14        JREQ      L:??atomThreadCreate_0
+   \   000010 905D         TNZW      Y
+   \   000012 27 10        JREQ      L:??atomThreadCreate_0
+   \   000014 BE ..        LDW       X, S:?w5
+   \   000016 27 0C        JREQ      L:??atomThreadCreate_0
+   \   000018 CD ....      CALL      L:?load32_l3_dbsp
+   \   00001B 0B           DC8       0xb
+   \   00001C BE ..        LDW       X, S:?w6
+   \   00001E 26 02        JRNE      L:??atomThreadCreate_1
+   \   000020 BE ..        LDW       X, S:?w7
+   \                     ??atomThreadCreate_1:
+   \   000022 26 05        JRNE      L:??atomThreadCreate_2
+    398              {
+    399                  /* Bad parameters */
+    400                  status = ATOM_ERR_PARAM;
+   \                     ??atomThreadCreate_0:
+   \   000024 A6 C9        LD        A, #0xc9
+   \   000026 CC ....      JP        L:?epilogue_l2_l3
+    401              }
+    402              else
+    403              {
+    404          
+    405                  /* Set up the TCB initial values */
+    406                  tcb_ptr->suspended = FALSE;
+   \                     ??atomThreadCreate_2:
+   \   000029 4F           CLR       A
+   \   00002A BE ..        LDW       X, S:?w4
+   \   00002C 1C 000D      ADDW      X, #0xd
+   \   00002F F7           LD        (X), A
+    407                  tcb_ptr->terminated = FALSE;
+   \   000030 BE ..        LDW       X, S:?w4
+   \   000032 1C 0011      ADDW      X, #0x11
+   \   000035 F7           LD        (X), A
+    408                  tcb_ptr->priority = priority;
+   \   000036 B6 ..        LD        A, S:?b6
+   \   000038 BE ..        LDW       X, S:?w4
+   \   00003A 1C 0002      ADDW      X, #0x2
+   \   00003D F7           LD        (X), A
+    409                  tcb_ptr->prev_tcb = NULL;
+   \   00003E 3F ..        CLR       S:?b5
+   \   000040 3F ..        CLR       S:?b4
+   \   000042 9089         PUSHW     Y
+   \   000044 BE ..        LDW       X, S:?w4
+   \   000046 90BE ..      LDW       Y, S:?w2
+   \   000049 1C 0009      ADDW      X, #0x9
+   \   00004C FF           LDW       (X), Y
+   \   00004D 9085         POPW      Y
+    410                  tcb_ptr->next_tcb = NULL;
+   \   00004F 9089         PUSHW     Y
+   \   000051 BE ..        LDW       X, S:?w4
+   \   000053 90BE ..      LDW       Y, S:?w2
+   \   000056 1C 000B      ADDW      X, #0xb
+   \   000059 FF           LDW       (X), Y
+   \   00005A 9085         POPW      Y
+    411                  tcb_ptr->suspend_timo_cb = NULL;
+   \   00005C 9089         PUSHW     Y
+   \   00005E BE ..        LDW       X, S:?w4
+   \   000060 90BE ..      LDW       Y, S:?w2
+   \   000063 1C 000F      ADDW      X, #0xf
+   \   000066 FF           LDW       (X), Y
+   \   000067 9085         POPW      Y
+    412          
+    413                  /**
+    414                   * Store the thread entry point and parameter in the TCB. This may
+    415                   * not be necessary for all architecture ports if they put all of
+    416                   * this information in the initial thread stack.
+    417                   */
+    418                  tcb_ptr->entry_point = entry_point;
+   \   000069 BE ..        LDW       X, S:?w4
+   \   00006B 1C 0003      ADDW      X, #0x3
+   \   00006E FF           LDW       (X), Y
+    419                  tcb_ptr->entry_param = entry_param;
+   \   00006F BE ..        LDW       X, S:?w4
+   \   000071 1C 0005      ADDW      X, #0x5
+   \   000074 CD ....      CALL      L:?load32_0x_l0
+    420          
+    421                  /**
+    422                   * Calculate a pointer to the topmost stack entry, suitably aligned
+    423                   * for the architecture. This may discard the top few bytes if the
+    424                   * stack size is not a multiple of the stack entry/alignment size.
+    425                   */
+    426                  stack_top = (uint8_t *)stack_bottom + (stack_size & ~(STACK_ALIGN_SIZE - 1)) - STACK_ALIGN_SIZE;
+    427          
+    428                  /**
+    429                   * Additional processing only required if stack-checking is
+    430                   * enabled. Incurs a slight overhead on each thread creation
+    431                   * and uses some additional storage in the TCB, but can be
+    432                   * compiled out if not desired.
+    433                   */
+    434          #ifdef ATOM_STACK_CHECKING
+    435                  /* Set up stack-checking if enabled for this thread */
+    436                  if (stack_check)
+    437                  {
+    438                      /* Store the stack details for use by the stack-check function */
+    439                      tcb_ptr->stack_bottom = stack_bottom;
+    440                      tcb_ptr->stack_size = stack_size;
+    441          
+    442                      /**
+    443                       * Prefill the stack with a known value. This is used later in
+    444                       * calls to atomThreadStackCheck() to get an indication of how
+    445                       * much stack has been used during runtime.
+    446                       */
+    447          		    count = (int32_t)stack_size;
+    448                      while (count > 0)
+    449                      {
+    450                          /* Initialise all stack bytes from top down to 0x5A */
+    451                          *((uint8_t *)stack_bottom + (count - 1)) = STACK_CHECK_BYTE;
+    452                          count--;
+    453                      }
+    454                  }
+    455          #else
+    456                  /* Avoid compiler warning due to unused parameter */
+    457                  stack_check = stack_check;
+    458          #endif
+    459          
+    460                  /**
+    461                   * Call the arch-specific routine to set up the stack. This routine
+    462                   * is responsible for creating the context save area necessary for
+    463                   * allowing atomThreadSwitch() to schedule it in. The initial
+    464                   * archContextSwitch() call when this thread gets scheduled in the
+    465                   * first time will then restore the program counter to the thread
+    466                   * entry point, and any other necessary register values ready for
+    467                   * it to start running.
+    468                   */
+    469                  archThreadContextInit (tcb_ptr, stack_top, entry_point, entry_param);
+   \   000077 CD ....      CALL      L:?mov_l1_l0
+   \   00007A 90BF ..      LDW       S:?w0, Y
+   \   00007D BE ..        LDW       X, S:?w7
+   \   00007F 72BB ....    ADDW      X, S:?w5
+   \   000083 5A           DECW      X
+   \   000084 9093         LDW       Y, X
+   \   000086 BE ..        LDW       X, S:?w4
+   \   000088 CD ....      CALL      L:archThreadContextInit
+    470          
+    471                  /* Protect access to the OS queue */
+    472                  CRITICAL_START ();
+   \   00008B 8A           PUSH      CC
+   \   00008C 84           POP       A
+   \   00008D A4 28        AND       A, #0x28
+   \   00008F B7 ..        LD        S:?b10, A
+   \   000091 9B           SIM
+    473          
+    474                  /* Put this thread on the ready queue */
+    475                  if (tcbEnqueuePriority (&tcbReadyQ, tcb_ptr) != ATOM_OK)
+   \   000092 90BE ..      LDW       Y, S:?w4
+   \   000095 AE ....      LDW       X, #tcbReadyQ
+   \   000098 CD ....      CALL      L:tcbEnqueuePriority
+   \   00009B A1 00        CP        A, #0x0
+   \   00009D 27 11        JREQ      L:??atomThreadCreate_3
+    476                  {
+    477                      /* Exit critical region */
+    478                      CRITICAL_END ();
+   \   00009F B6 ..        LD        A, S:?b10
+   \   0000A1 B7 ..        LD        S:?b0, A
+   \   0000A3 8A           PUSH      CC
+   \   0000A4 84           POP       A
+   \   0000A5 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000A7 BA ..        OR        A, S:?b0
+   \   0000A9 88           PUSH      A
+   \   0000AA 86           POP       CC
+    479          
+    480                      /* Queue-related error */
+    481                      status = ATOM_ERR_QUEUE;
+   \   0000AB A6 CC        LD        A, #0xcc
+   \   0000AD CC ....      JP        L:?epilogue_l2_l3
+    482                  }
+    483                  else
+    484                  {
+    485                      /* Exit critical region */
+    486                      CRITICAL_END ();
+   \                     ??atomThreadCreate_3:
+   \   0000B0 B6 ..        LD        A, S:?b10
+   \   0000B2 B7 ..        LD        S:?b0, A
+   \   0000B4 8A           PUSH      CC
+   \   0000B5 84           POP       A
+   \   0000B6 A4 D7        AND       A, #0xffffffffffffffd7
+   \   0000B8 BA ..        OR        A, S:?b0
+   \   0000BA 88           PUSH      A
+   \   0000BB 86           POP       CC
+    487          
+    488                      /**
+    489                       * If the OS is started and we're in thread context, check if we
+    490                       * should be scheduled in now.
+    491                       */
+    492                      if ((atomOSStarted == TRUE) && atomCurrentContext())
+   \   0000BC A6 01        LD        A, #0x1
+   \   0000BE C1 ....      CP        A, L:atomOSStarted
+   \   0000C1 26 0A        JRNE      L:??atomThreadCreate_4
+   \   0000C3 CD ....      CALL      L:atomCurrentContext
+   \   0000C6 5D           TNZW      X
+   \   0000C7 27 04        JREQ      L:??atomThreadCreate_4
+    493                          atomSched (FALSE);
+   \   0000C9 4F           CLR       A
+   \   0000CA CD ....      CALL      L:atomSched
+    494          
+    495                      /* Success */
+    496                      status = ATOM_OK;
+   \                     ??atomThreadCreate_4:
+   \   0000CD 4F           CLR       A
+    497                  }
+    498              }
+    499          
+    500              return (status);
+   \   0000CE CC ....      JP        L:?epilogue_l2_l3
+    501          }
+    502          
+    503          
+    504          #ifdef ATOM_STACK_CHECKING
+    505          /**
+    506           * \b atomThreadStackCheck
+    507           *
+    508           * Check the stack usage of a thread.
+    509           *
+    510           * If the ATOM_STACK_CHECKING macro is defined, thread stacks are filled
+    511           * with a known value before the thread is started. This function can be
+    512           * called at runtime to examine the stack and find the high water mark
+    513           * (the furthest modified byte from the start of the stack).
+    514           *
+    515           * This gives an indication of how much stack the thread has used. It is
+    516           * useful but not absolutely precise because the thread may legitimately
+    517           * have the known value on its stack. The thread's stack pointer may also
+    518           * have strayed outside of the allowable stack area while leaving some of
+    519           * the known-value bytes unmodified. This simple method cannot trap stack
+    520           * usage outside of the thread's allocated stack, for which you could use
+    521           * additional guard areas (still limited in scope) or compiler/CPU/MMU
+    522           * features.
+    523           *
+    524           * The function takes a thread's TCB and returns both the number of stack
+    525           * bytes used, and the free stack bytes.
+    526           *
+    527           * @param[in] tcb_ptr Pointer to the TCB of the thread to stack-check
+    528           * @param[in,out] used_bytes Pointer into which the used byte count is copied
+    529           * @param[in,out] free_bytes Pointer into which the free byte count is copied
+    530           *
+    531           * @retval ATOM_OK Success
+    532           * @retval ATOM_ERR_PARAM Bad parameters
+    533           * @retval ATOM_ERR_QUEUE Error putting the thread on the ready queue
+    534           */
+    535          uint8_t atomThreadStackCheck (ATOM_TCB *tcb_ptr, uint32_t *used_bytes, uint32_t *free_bytes)
+    536          {
+    537              uint8_t status;
+    538              uint8_t *stack_ptr;
+    539              int i;
+    540          
+    541              if ((tcb_ptr == NULL) || (used_bytes == NULL) || (free_bytes == NULL))
+    542              {
+    543                  /* Bad parameters */
+    544                  status = ATOM_ERR_PARAM;
+    545              }
+    546              else
+    547              {
+    548                  /**
+    549                   * Starting at the bottom end, count the unmodified areas until a
+    550                   * modified byte is found.
+    551                   */
+    552                  stack_ptr = (uint8_t *)tcb_ptr->stack_bottom;
+    553                  for (i = 0; i < tcb_ptr->stack_size; i++)
+    554                  {
+    555                      /* Loop until a modified byte is found */
+    556                      if (*stack_ptr++ != STACK_CHECK_BYTE)
+    557                      {
+    558                          /* Found a modified byte */
+    559                          break;
+    560                      }
+    561                  }
+    562          
+    563                  /* We quit the loop above on the count of the free bytes */
+    564                  *free_bytes = (uint32_t)i;
+    565          
+    566                  /* Calculate used bytes using our knowledge of the stack size */
+    567                  *used_bytes = tcb_ptr->stack_size - *free_bytes;
+    568          
+    569                  /* No error */
+    570                  status = ATOM_OK;
+    571          
+    572              }
+    573          
+    574              return (status);
+    575          
+    576          }
+    577          #endif /* ATOM_STACK_CHECKING */
+    578          
+    579          
+    580          /**
+    581           * \b atomIntEnter
+    582           *
+    583           * Interrupt handler entry routine.
+    584           *
+    585           * Must be called at the start of any interrupt handlers that may
+    586           * call an OS primitive and make a thread ready.
+    587           *
+    588           * @return None
+    589           */
+
+   \                                 In section .near_func.text, align 1, keep-with-next
+    590          void atomIntEnter (void)
+    591          {
+    592              /* Increment the interrupt count */
+    593              atomIntCnt++;
+   \                     atomIntEnter:
+   \   000000 CE ....      LDW       X, L:atomIntCnt
+   \   000003 5C           INCW      X
+   \   000004 CF ....      LDW       L:atomIntCnt, X
+    594          }
+   \   000007 81           RET
+    595          
+    596          
+    597          /**
+    598           * \b atomIntExit
+    599           *
+    600           * Interrupt handler exit routine.
+    601           *
+    602           * Must be called at the end of any interrupt handlers that may
+    603           * call an OS primitive and make a thread ready.
+    604           *
+    605           * This is responsible for calling the scheduler at the end of
+    606           * interrupt handlers to determine whether a new thread has now
+    607           * been made ready and should be scheduled in.
+    608           *
+    609           * @param timer_tick TRUE if this is a timer tick
+    610           *
+    611           * @return None
+    612           */
+
+   \                                 In section .near_func.text, align 1
+    613          void atomIntExit (uint8_t timer_tick)
+    614          {
+    615              /* Decrement the interrupt count */
+    616              atomIntCnt--;
+   \                     atomIntExit:
+   \   000000 CE ....      LDW       X, L:atomIntCnt
+   \   000003 5A           DECW      X
+   \   000004 CF ....      LDW       L:atomIntCnt, X
+    617          
+    618              /* Call the scheduler */
+    619              atomSched (timer_tick);
+   \   000007 CC ....      JP        L:atomSched
+    620          }
+    621          
+    622          
+    623          /**
+    624           * \b atomCurrentContext
+    625           *
+    626           * Get the current thread context.
+    627           *
+    628           * Returns a pointer to the current thread's TCB, or NULL if not in
+    629           * thread-context (in interrupt context).
+    630           *
+    631           * @retval Pointer to current thread's TCB, NULL if in interrupt context
+    632           */
+
+   \                                 In section .near_func.text, align 1
+    633          ATOM_TCB *atomCurrentContext (void)
+    634          {
+    635              /* Return the current thread's TCB or NULL if in interrupt context */
+    636              if (atomIntCnt == 0)
+   \                     atomCurrentContext:
+   \   000000 CE ....      LDW       X, L:atomIntCnt
+   \   000003 26 04        JRNE      L:??atomCurrentContext_0
+    637                  return (curr_tcb);
+   \   000005 CE ....      LDW       X, L:curr_tcb
+   \   000008 81           RET
+    638              else
+    639                  return (NULL);
+   \                     ??atomCurrentContext_0:
+   \   000009 5F           CLRW      X
+   \   00000A 81           RET
+    640          }
+    641          
+    642          
+    643          /**
+    644           * \b atomOSInit
+    645           *
+    646           * Initialise the atomthreads OS.
+    647           *
+    648           * Must be called before any application code uses the atomthreads APIs. No
+    649           * threads are actually started until the application calls atomOSStart().
+    650           *
+    651           * Callers must provide a pointer to some storage for the idle thread stack.
+    652           * The caller is responsible for calculating the appropriate space required
+    653           * for their particular architecture.
+    654           *
+    655           * Applications should use the following initialisation sequence:
+    656           *
+    657           * \li Call atomOSInit() before calling any atomthreads APIs
+    658           * \li Arrange for a timer to call atomTimerTick() periodically
+    659           * \li Create one or more application threads using atomThreadCreate()
+    660           * \li Start the OS using atomOSStart(). At this point the highest
+    661           *     priority application thread created will be started.
+    662           *
+    663           * Interrupts should be disabled until the first thread restore is complete,
+    664           * to avoid any complications due to interrupts occurring while crucial
+    665           * operating system facilities are being initialised. They are normally
+    666           * enabled by the archFirstThreadRestore() routine in the architecture port.
+    667           *
+    668           * @param[in] idle_thread_stack_bottom Ptr to bottom of stack for idle thread
+    669           * @param[in] idle_thread_stack_size Size of idle thread stack in bytes
+    670           * @param[in] idle_thread_stack_check TRUE if stack checking required on idle thread
+    671           *
+    672           * @retval ATOM_OK Success
+    673           * @retval ATOM_ERROR Initialisation error
+    674           */
+
+   \                                 In section .near_func.text, align 1
+    675          uint8_t atomOSInit (void *idle_thread_stack_bottom, uint32_t idle_thread_stack_size, uint8_t idle_thread_stack_check)
+    676          {
+   \                     atomOSInit:
+   \   000000 BF ..        LDW       S:?w2, X
+    677              uint8_t status;
+    678          
+    679              /* Initialise data */
+    680              curr_tcb = NULL;
+   \   000002 5F           CLRW      X
+   \   000003 CF ....      LDW       L:curr_tcb, X
+    681              tcbReadyQ = NULL;
+   \   000006 CF ....      LDW       L:tcbReadyQ, X
+    682              atomOSStarted = FALSE;
+   \   000009 725F ....    CLR       L:atomOSStarted
+    683          
+    684              /* Create the idle thread */
+    685              status = atomThreadCreate(&idle_tcb,
+    686                           IDLE_THREAD_PRIORITY,
+    687                           atomIdleThread,
+    688                           0,
+    689                           idle_thread_stack_bottom,
+    690                           idle_thread_stack_size,
+    691          				 idle_thread_stack_check);
+    692          
+    693              /* Return status */
+    694              return (status);
+   \   00000D CD ....      CALL      L:?push_l0
+   \   000010 B7 ..        LD        S:?b6, A
+   \   000012 BF ..        LDW       S:?w1, X
+   \   000014 BF ..        LDW       S:?w0, X
+   \   000016 90AE ....    LDW       Y, #atomIdleThread
+   \   00001A A6 FF        LD        A, #0xff
+   \   00001C AE ....      LDW       X, #idle_tcb
+   \   00001F CD ....      CALL      L:atomThreadCreate
+   \   000022 5B 04        ADD       SP, #0x4
+   \   000024 81           RET
+    695          
+    696          }
+    697          /**
+    698           * \b atomOSStart
+    699           *
+    700           * Start the highest priority thread running.
+    701           *
+    702           * This function must be called after all OS initialisation is complete, and
+    703           * at least one application thread has been created. It will start executing
+    704           * the highest priority thread created (or first created if multiple threads
+    705           * share the highest priority).
+    706           *
+    707           * Interrupts must still be disabled at this point. They must only be enabled
+    708           * when the first thread is restored and started by the architecture port's
+    709           * archFirstThreadRestore() routine.
+    710           *
+    711           * @return None
+    712           */
+
+   \                                 In section .near_func.text, align 1
+    713          void atomOSStart (void)
+    714          {
+    715              ATOM_TCB *new_tcb;
+    716          
+    717              /**
+    718               * Enable the OS started flag. This stops routines like atomThreadCreate()
+    719               * attempting to schedule in a newly-created thread until the scheduler is
+    720               * up and running.
+    721               */
+    722              atomOSStarted = TRUE;
+   \                     atomOSStart:
+   \   000000 35 01 ....   MOV       L:atomOSStarted, #0x1
+    723          
+    724              /**
+    725               * Application calls to atomThreadCreate() should have added at least one
+    726               * thread to the ready queue. Take the highest priority one off and
+    727               * schedule it in. If no threads were created, the OS will simply start
+    728               * the idle thread (the lowest priority allowed to be scheduled is the
+    729               * idle thread's priority, 255).
+    730               */
+    731              new_tcb = tcbDequeuePriority (&tcbReadyQ, 255);
+   \   000004 A6 FF        LD        A, #0xff
+   \   000006 AE ....      LDW       X, #tcbReadyQ
+   \   000009 CD ....      CALL      L:tcbDequeuePriority
+    732              if (new_tcb)
+   \   00000C 5D           TNZW      X
+   \   00000D 27 06        JREQ      L:??atomOSStart_0
+    733              {
+    734                  /* Set the new currently-running thread pointer */
+    735                  curr_tcb = new_tcb;
+   \   00000F CF ....      LDW       L:curr_tcb, X
+    736          
+    737                  /* Restore and run the first thread */
+    738                  archFirstThreadRestore (new_tcb);
+   \   000012 CD ....      CALL      L:archFirstThreadRestore
+    739          
+    740                  /* Never returns to here, execution shifts to new thread context */
+    741              }
+    742              else
+    743              {
+    744                  /* No ready threads were found. atomOSInit() probably was not called */
+    745              }
+    746          
+    747          }
+   \                     ??atomOSStart_0:
+   \   000015 81           RET
+    748          
+    749          
+    750          /**
+    751           * \b atomIdleThread
+    752           *
+    753           * Entry point for idle thread.
+    754           *
+    755           * This thread must always be present, and will be the thread executed when
+    756           * no other threads are ready to run. It must not call any library routines
+    757           * which would cause it to block.
+    758           *
+    759           * @param[in] param Unused (optional thread entry parameter)
+    760           *
+    761           * @return None
+    762           */
+
+   \                                 In section .near_func.text, align 1
+    763          static void atomIdleThread (uint32_t param)
+    764          {
+    765              /* Compiler warning  */
+    766              param = param;
+    767          
+    768              /* Loop forever */
+    769              while (1)
+   \                     atomIdleThread:
+   \                     ??atomIdleThread_0:
+   \   000000 20 FE        JRA       L:??atomIdleThread_0
+    770              {
+    771                  /** \todo Provide user idle hooks*/
+    772              }
+    773          }
+    774          
+    775          
+    776          /**
+    777           * \b tcbEnqueuePriority
+    778           *
+    779           * This is an internal function not for use by application code.
+    780           *
+    781           * Enqueues the TCB \c tcb_ptr on the TCB queue pointed to by \c tcb_queue_ptr.
+    782           * TCBs are placed on the queue in priority order. If there are existing TCBs
+    783           * at the same priority as the TCB to be enqueued, the enqueued TCB will be
+    784           * placed at the end of the same-priority TCBs. Calls to tcbDequeuePriority()
+    785           * will dequeue same-priority TCBs in FIFO order.
+    786           *
+    787           * \c tcb_queue_ptr may be modified by the routine if the enqueued TCB becomes
+    788           * the new list head. It is valid for tcb_queue_ptr to point to a NULL pointer,
+    789           * which is the case if the queue is currently empty.
+    790           *
+    791           * \b NOTE: Assumes that the caller is already in a critical section.
+    792           *
+    793           * @param[in,out] tcb_queue_ptr Pointer to TCB queue head pointer
+    794           * @param[in] tcb_ptr Pointer to TCB to enqueue
+    795           *
+    796           * @retval ATOM_OK Success
+    797           * @retval ATOM_ERR_PARAM Bad parameters
+    798           */
+
+   \                                 In section .near_func.text, align 1
+    799          uint8_t tcbEnqueuePriority (ATOM_TCB **tcb_queue_ptr, ATOM_TCB *tcb_ptr)
+    800          {
+   \                     tcbEnqueuePriority:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 BF ..        LDW       S:?w0, X
+    801              uint8_t status;
+    802              ATOM_TCB *prev_ptr, *next_ptr;
+    803          
+    804              /* Parameter check */
+    805              if ((tcb_queue_ptr == NULL) || (tcb_ptr == NULL))
+   \   000005 27 04        JREQ      L:??tcbEnqueuePriority_0
+   \   000007 905D         TNZW      Y
+   \   000009 26 05        JRNE      L:??tcbEnqueuePriority_1
+    806              {
+    807                  /* Return error */
+    808                  status = ATOM_ERR_PARAM;
+   \                     ??tcbEnqueuePriority_0:
+   \   00000B A6 C9        LD        A, #0xc9
+   \   00000D CC ....      JP        L:?epilogue_w4
+    809              }
+    810              else
+    811              {
+    812                  /* Walk the list and enqueue at the end of the TCBs at this priority */
+    813                  prev_ptr = next_ptr = *tcb_queue_ptr;
+   \                     ??tcbEnqueuePriority_1:
+   \   000010 92CE ..      LDW       X, [S:?w0.w]
+   \   000013 BF ..        LDW       S:?w2, X
+   \   000015 CD ....      CALL      L:?mov_w1_w2
+    814                  do
+    815                  {
+    816                      /* Insert if:
+    817                       *   next_ptr = NULL (we're at the head of an empty queue or at the tail)
+    818                       *   the next TCB in the list is lower priority than the one we're enqueuing.
+    819                       */
+    820                      if ((next_ptr == NULL) || (next_ptr->priority > tcb_ptr->priority))
+   \                     ??tcbEnqueuePriority_2:
+   \   000018 BE ..        LDW       X, S:?w2
+   \   00001A 27 0F        JREQ      L:??tcbEnqueuePriority_3
+   \   00001C 1C 0002      ADDW      X, #0x2
+   \   00001F BF ..        LDW       S:?w3, X
+   \   000021 93           LDW       X, Y
+   \   000022 1C 0002      ADDW      X, #0x2
+   \   000025 F6           LD        A, (X)
+   \   000026 92C1 ..      CP        A, [S:?w3.w]
+   \   000029 24 3D        JRNC      L:??tcbEnqueuePriority_4
+    821                      {
+    822                          /* Make this TCB the new listhead */
+    823                          if (next_ptr == *tcb_queue_ptr)
+   \                     ??tcbEnqueuePriority_3:
+   \   00002B 93           LDW       X, Y
+   \   00002C 1C 000B      ADDW      X, #0xb
+   \   00002F BF ..        LDW       S:?w3, X
+   \   000031 93           LDW       X, Y
+   \   000032 1C 0009      ADDW      X, #0x9
+   \   000035 BF ..        LDW       S:?w4, X
+   \   000037 BE ..        LDW       X, S:?w2
+   \   000039 92C3 ..      CPW       X, [S:?w0.w]
+   \   00003C 26 10        JRNE      L:??tcbEnqueuePriority_5
+    824                          {
+    825                              *tcb_queue_ptr = tcb_ptr;
+   \   00003E BE ..        LDW       X, S:?w0
+   \   000040 FF           LDW       (X), Y
+    826                              tcb_ptr->prev_tcb = NULL;
+   \   000041 5F           CLRW      X
+   \   000042 92CF ..      LDW       [S:?w4.w], X
+    827                              tcb_ptr->next_tcb = next_ptr;
+   \   000045 BE ..        LDW       X, S:?w2
+   \   000047 92CF ..      LDW       [S:?w3.w], X
+    828                              if (next_ptr)
+   \   00004A 27 2B        JREQ      L:??tcbEnqueuePriority_6
+   \   00004C 20 14        JRA       L:??tcbEnqueuePriority_7
+    829                                  next_ptr->prev_tcb = tcb_ptr;
+    830                          }
+    831                          /* Insert between two TCBs or at the tail */
+    832                          else
+    833                          {
+    834                              tcb_ptr->prev_tcb = prev_ptr;
+   \                     ??tcbEnqueuePriority_5:
+   \   00004E BE ..        LDW       X, S:?w1
+   \   000050 92CF ..      LDW       [S:?w4.w], X
+    835                              tcb_ptr->next_tcb = next_ptr;
+   \   000053 BE ..        LDW       X, S:?w2
+   \   000055 92CF ..      LDW       [S:?w3.w], X
+    836                              prev_ptr->next_tcb = tcb_ptr;
+   \   000058 BE ..        LDW       X, S:?w1
+   \   00005A 1C 000B      ADDW      X, #0xb
+   \   00005D FF           LDW       (X), Y
+    837                              if (next_ptr)
+   \   00005E BE ..        LDW       X, S:?w2
+   \   000060 27 15        JREQ      L:??tcbEnqueuePriority_6
+    838                                  next_ptr->prev_tcb = tcb_ptr;
+   \                     ??tcbEnqueuePriority_7:
+   \   000062 1C 0009      ADDW      X, #0x9
+   \   000065 FF           LDW       (X), Y
+   \   000066 20 0F        JRA       L:??tcbEnqueuePriority_6
+    839                          }
+    840          
+    841                          /* Quit the loop, we've finished inserting */
+    842                          break;
+    843                      }
+    844                      else
+    845                      {
+    846                          /* Not inserting here, try the next one */
+    847                          prev_ptr = next_ptr;
+   \                     ??tcbEnqueuePriority_4:
+   \   000068 CD ....      CALL      L:?mov_w1_w2
+    848                          next_ptr = next_ptr->next_tcb;
+   \   00006B BE ..        LDW       X, S:?w2
+   \   00006D 1C 000B      ADDW      X, #0xb
+   \   000070 FE           LDW       X, (X)
+   \   000071 BF ..        LDW       S:?w2, X
+    849                      }
+    850          
+    851                  }
+    852                  while (prev_ptr != NULL);
+   \   000073 BE ..        LDW       X, S:?w1
+   \   000075 26 A1        JRNE      L:??tcbEnqueuePriority_2
+    853          
+    854                  /* Successful */
+    855                  status = ATOM_OK;
+   \                     ??tcbEnqueuePriority_6:
+   \   000077 4F           CLR       A
+    856              }
+    857          
+    858              return (status);
+   \   000078 CC ....      JP        L:?epilogue_w4
+    859          }
+    860          
+    861          
+    862          /**
+    863           * \b tcbDequeueHead
+    864           *
+    865           * This is an internal function not for use by application code.
+    866           *
+    867           * Dequeues the highest priority TCB on the queue pointed to by
+    868           * \c tcb_queue_ptr.
+    869           *
+    870           * The TCB will be removed from the queue. Same priority TCBs are dequeued in
+    871           * FIFO order.
+    872           *
+    873           * \c tcb_queue_ptr will be modified by the routine if a TCB is dequeued,
+    874           * as this will be the list head. It is valid for tcb_queue_ptr to point to a
+    875           * NULL pointer, which is the case if the queue is currently empty. In this
+    876           * case the function returns NULL.
+    877           *
+    878           * \b NOTE: Assumes that the caller is already in a critical section.
+    879           *
+    880           * @param[in,out] tcb_queue_ptr Pointer to TCB queue head pointer
+    881           *
+    882           * @return Pointer to highest priority TCB on queue, or NULL if queue empty
+    883           */
+
+   \                                 In section .near_func.text, align 1
+    884          ATOM_TCB *tcbDequeueHead (ATOM_TCB **tcb_queue_ptr)
+    885          {
+   \                     tcbDequeueHead:
+   \   000000 9093         LDW       Y, X
+    886              ATOM_TCB *ret_ptr;
+    887          
+    888              /* Parameter check */
+    889              if (tcb_queue_ptr == NULL)
+   \   000002 905D         TNZW      Y
+   \   000004 27 05        JREQ      L:??tcbDequeueHead_0
+    890              {
+    891                  /* Return NULL */
+    892                  ret_ptr = NULL;
+    893              }
+    894              /* Check for an empty queue */
+    895              else if (*tcb_queue_ptr == NULL)
+   \   000006 FE           LDW       X, (X)
+   \   000007 BF ..        LDW       S:?w1, X
+   \   000009 26 06        JRNE      L:??tcbDequeueHead_1
+    896              {
+    897                  /* Return NULL */
+    898                  ret_ptr = NULL;
+   \                     ??tcbDequeueHead_0:
+   \   00000B 3F ..        CLR       S:?b3
+   \   00000D 3F ..        CLR       S:?b2
+   \   00000F 20 1F        JRA       L:??tcbDequeueHead_2
+    899              }
+    900              /* Remove and return the listhead */
+    901              else
+    902              {
+    903                  ret_ptr = *tcb_queue_ptr;
+    904                  *tcb_queue_ptr = ret_ptr->next_tcb;
+   \                     ??tcbDequeueHead_1:
+   \   000011 1C 000B      ADDW      X, #0xb
+   \   000014 BF ..        LDW       S:?w0, X
+   \   000016 92CE ..      LDW       X, [S:?w0.w]
+   \   000019 90FF         LDW       (Y), X
+    905                  if (*tcb_queue_ptr)
+   \   00001B 27 06        JREQ      L:??tcbDequeueHead_3
+    906                      (*tcb_queue_ptr)->prev_tcb = NULL;
+   \   00001D 905F         CLRW      Y
+   \   00001F 1C 0009      ADDW      X, #0x9
+   \   000022 FF           LDW       (X), Y
+    907                  ret_ptr->next_tcb = ret_ptr->prev_tcb = NULL;
+   \                     ??tcbDequeueHead_3:
+   \   000023 5F           CLRW      X
+   \   000024 90BE ..      LDW       Y, S:?w1
+   \   000027 72A9 0009    ADDW      Y, #0x9
+   \   00002B 90FF         LDW       (Y), X
+   \   00002D 92CF ..      LDW       [S:?w0.w], X
+    908              }
+    909          
+    910              return (ret_ptr);
+   \                     ??tcbDequeueHead_2:
+   \   000030 BE ..        LDW       X, S:?w1
+   \   000032 81           RET
+    911          }
+    912          
+    913          
+    914          /**
+    915           * \b tcbDequeueEntry
+    916           *
+    917           * This is an internal function not for use by application code.
+    918           *
+    919           * Dequeues a particular TCB from the queue pointed to by \c tcb_queue_ptr.
+    920           *
+    921           * The TCB will be removed from the queue.
+    922           *
+    923           * \c tcb_queue_ptr may be modified by the routine if the dequeued TCB was
+    924           * the list head. It is valid for tcb_queue_ptr to point to a NULL pointer,
+    925           * which is the case if the queue is currently empty. In this case the
+    926           * function returns NULL.
+    927           *
+    928           * \b NOTE: Assumes that the caller is already in a critical section.
+    929           *
+    930           * @param[in,out] tcb_queue_ptr Pointer to TCB queue head pointer
+    931           * @param[in] tcb_ptr Pointer to TCB to dequeue
+    932           *
+    933           * @return Pointer to the dequeued TCB, or NULL if entry wasn't found
+    934           */
+
+   \                                 In section .near_func.text, align 1
+    935          ATOM_TCB *tcbDequeueEntry (ATOM_TCB **tcb_queue_ptr, ATOM_TCB *tcb_ptr)
+    936          {
+   \                     tcbDequeueEntry:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 BF ..        LDW       S:?w2, X
+   \   000005 90BF ..      LDW       S:?w5, Y
+    937              ATOM_TCB *ret_ptr, *prev_ptr, *next_ptr;
+    938          
+    939              /* Parameter check */
+    940              if (tcb_queue_ptr == NULL)
+   \   000008 5D           TNZW      X
+   \   000009 27 05        JREQ      L:??tcbDequeueEntry_0
+    941              {
+    942                  /* Return NULL */
+    943                  ret_ptr = NULL;
+    944              }
+    945              /* Check for an empty queue */
+    946              else if (*tcb_queue_ptr == NULL)
+   \   00000B 92CE ..      LDW       X, [S:?w2.w]
+   \   00000E 26 06        JRNE      L:??tcbDequeueEntry_1
+    947              {
+    948                  /* Return NULL */
+    949                  ret_ptr = NULL;
+   \                     ??tcbDequeueEntry_0:
+   \   000010 3F ..        CLR       S:?b9
+   \   000012 3F ..        CLR       S:?b8
+   \   000014 20 6F        JRA       L:??tcbDequeueEntry_2
+    950              }
+    951              /* Find and remove/return the specified entry */
+    952              else
+    953              {
+    954                  ret_ptr = NULL;
+   \                     ??tcbDequeueEntry_1:
+   \   000016 3F ..        CLR       S:?b9
+   \   000018 3F ..        CLR       S:?b8
+    955                  prev_ptr = next_ptr = *tcb_queue_ptr;
+   \   00001A BF ..        LDW       S:?w0, X
+   \   00001C CD ....      CALL      L:?mov_w1_w0
+   \   00001F 20 06        JRA       L:??tcbDequeueEntry_3
+    956                  while (next_ptr)
+    957                  {
+    958                      /* Is this entry the one we're looking for? */
+    959                      if (next_ptr == tcb_ptr)
+    960                      {
+    961                          if (next_ptr == *tcb_queue_ptr)
+    962                          {
+    963                              /* We're removing the list head */
+    964                              *tcb_queue_ptr = next_ptr->next_tcb;
+    965                              if (*tcb_queue_ptr)
+    966                                  (*tcb_queue_ptr)->prev_tcb = NULL;
+    967                          }
+    968                          else
+    969                          {
+    970                              /* We're removing a mid or tail TCB */
+    971                              prev_ptr->next_tcb = next_ptr->next_tcb;
+    972                              if (next_ptr->next_tcb)
+    973                                  next_ptr->next_tcb->prev_tcb = prev_ptr;
+    974                          }
+    975                          ret_ptr = next_ptr;
+    976                          ret_ptr->prev_tcb = ret_ptr->next_tcb = NULL;
+    977                          break;
+    978                      }
+    979          
+    980                      /* Move on to the next in the list */
+    981                      prev_ptr = next_ptr;
+   \                     ??tcbDequeueEntry_4:
+   \   000021 CD ....      CALL      L:?mov_w1_w0
+    982                      next_ptr = next_ptr->next_tcb;
+   \   000024 CD ....      CALL      L:?mov_w0_w3
+   \                     ??tcbDequeueEntry_3:
+   \   000027 BE ..        LDW       X, S:?w0
+   \   000029 27 5A        JREQ      L:??tcbDequeueEntry_2
+   \   00002B 1C 000B      ADDW      X, #0xb
+   \   00002E 9093         LDW       Y, X
+   \   000030 90FE         LDW       Y, (Y)
+   \   000032 90BF ..      LDW       S:?w3, Y
+   \   000035 90BE ..      LDW       Y, S:?w0
+   \   000038 90B3 ..      CPW       Y, S:?w5
+   \   00003B 26 E4        JRNE      L:??tcbDequeueEntry_4
+   \   00003D 91C3 ..      CPW       Y, [S:?w2.w]
+   \   000040 26 14        JRNE      L:??tcbDequeueEntry_5
+   \   000042 90BE ..      LDW       Y, S:?w3
+   \   000045 91CF ..      LDW       [S:?w2.w], Y
+   \   000048 27 2B        JREQ      L:??tcbDequeueEntry_6
+   \   00004A 905F         CLRW      Y
+   \   00004C 89           PUSHW     X
+   \   00004D BE ..        LDW       X, S:?w3
+   \   00004F 1C 0009      ADDW      X, #0x9
+   \   000052 FF           LDW       (X), Y
+   \   000053 85           POPW      X
+   \   000054 20 1F        JRA       L:??tcbDequeueEntry_6
+   \                     ??tcbDequeueEntry_5:
+   \   000056 89           PUSHW     X
+   \   000057 BE ..        LDW       X, S:?w1
+   \   000059 90BE ..      LDW       Y, S:?w3
+   \   00005C 1C 000B      ADDW      X, #0xb
+   \   00005F FF           LDW       (X), Y
+   \   000060 85           POPW      X
+   \   000061 9093         LDW       Y, X
+   \   000063 90FE         LDW       Y, (Y)
+   \   000065 90BF ..      LDW       S:?w2, Y
+   \   000068 27 0B        JREQ      L:??tcbDequeueEntry_6
+   \   00006A 90BE ..      LDW       Y, S:?w1
+   \   00006D 89           PUSHW     X
+   \   00006E BE ..        LDW       X, S:?w2
+   \   000070 1C 0009      ADDW      X, #0x9
+   \   000073 FF           LDW       (X), Y
+   \   000074 85           POPW      X
+   \                     ??tcbDequeueEntry_6:
+   \   000075 CD ....      CALL      L:?mov_w4_w0
+   \   000078 905F         CLRW      Y
+   \   00007A FF           LDW       (X), Y
+   \   00007B 5F           CLRW      X
+   \   00007C 90BE ..      LDW       Y, S:?w4
+   \   00007F 72A9 0009    ADDW      Y, #0x9
+   \   000083 90FF         LDW       (Y), X
+    983                  }
+    984              }
+    985          
+    986              return (ret_ptr);
+   \                     ??tcbDequeueEntry_2:
+   \   000085 BE ..        LDW       X, S:?w4
+   \   000087 CC ....      JP        L:?epilogue_l2
+    987          }
+    988          
+    989          
+    990          /**
+    991           * \b tcbDequeuePriority
+    992           *
+    993           * This is an internal function not for use by application code.
+    994           *
+    995           * Dequeues the first TCB of the given priority or higher, from the queue
+    996           * pointed to by \c tcb_queue_ptr. Because the queue is ordered high priority
+    997           * first, we only ever dequeue the list head, if any. If the list head is
+    998           * lower priority than we wish to dequeue, then all following ones will also
+    999           * be lower priority and hence are not parsed.
+   1000           *
+   1001           * The TCB will be removed from the queue. Same priority TCBs will be dequeued
+   1002           * in FIFO order.
+   1003           *
+   1004           * \c tcb_queue_ptr may be modified by the routine if the dequeued TCB was
+   1005           * the list head. It is valid for tcb_queue_ptr to point to a NULL pointer,
+   1006           * which is the case if the queue is currently empty. In this case the
+   1007           * function returns NULL.
+   1008           *
+   1009           * \b NOTE: Assumes that the caller is already in a critical section.
+   1010           *
+   1011           * @param[in,out] tcb_queue_ptr Pointer to TCB queue head pointer
+   1012           * @param[in] priority Minimum priority to qualify for dequeue
+   1013           *
+   1014           * @return Pointer to the dequeued TCB, or NULL if none found within priority
+   1015           */
+
+   \                                 In section .near_func.text, align 1
+   1016          ATOM_TCB *tcbDequeuePriority (ATOM_TCB **tcb_queue_ptr, uint8_t priority)
+   1017          {
+   \                     tcbDequeuePriority:
+   \   000000 9093         LDW       Y, X
+   1018              ATOM_TCB *ret_ptr;
+   1019          
+   1020              /* Parameter check */
+   1021              if (tcb_queue_ptr == NULL)
+   \   000002 905D         TNZW      Y
+   \   000004 27 25        JREQ      L:??tcbDequeuePriority_0
+   1022              {
+   1023                  /* Return NULL */
+   1024                  ret_ptr = NULL;
+   1025              }
+   1026              /* Check for an empty queue */
+   1027              else if (*tcb_queue_ptr == NULL)
+   \   000006 FE           LDW       X, (X)
+   \   000007 BF ..        LDW       S:?w1, X
+   \   000009 27 20        JREQ      L:??tcbDequeuePriority_0
+   1028              {
+   1029                  /* Return NULL */
+   1030                  ret_ptr = NULL;
+   1031              }
+   1032              /* Check if the list head priority is within our range */
+   1033              else if ((*tcb_queue_ptr)->priority <= priority)
+   \   00000B 1C 0002      ADDW      X, #0x2
+   \   00000E F1           CP        A, (X)
+   \   00000F 25 1A        JRC       L:??tcbDequeuePriority_0
+   1034              {
+   1035                 /* Remove the list head */
+   1036                  ret_ptr = *tcb_queue_ptr;
+   1037                  *tcb_queue_ptr = (*tcb_queue_ptr)->next_tcb;
+   \   000011 BE ..        LDW       X, S:?w1
+   \   000013 1C 000B      ADDW      X, #0xb
+   \   000016 BF ..        LDW       S:?w0, X
+   \   000018 92CE ..      LDW       X, [S:?w0.w]
+   \   00001B 90FF         LDW       (Y), X
+   1038                  if (*tcb_queue_ptr)
+   \   00001D 27 10        JREQ      L:??tcbDequeuePriority_1
+   1039                  {
+   1040                      (*tcb_queue_ptr)->prev_tcb = NULL;
+   \   00001F 905F         CLRW      Y
+   \   000021 1C 0009      ADDW      X, #0x9
+   \   000024 FF           LDW       (X), Y
+   1041                      ret_ptr->next_tcb = NULL;
+   \   000025 5F           CLRW      X
+   \   000026 92CF ..      LDW       [S:?w0.w], X
+   \   000029 20 04        JRA       L:??tcbDequeuePriority_1
+   1042                  }
+   1043              }
+   1044              else
+   1045              {
+   1046                  /* No higher priority ready threads found */
+   1047                  ret_ptr = NULL;
+   \                     ??tcbDequeuePriority_0:
+   \   00002B 3F ..        CLR       S:?b3
+   \   00002D 3F ..        CLR       S:?b2
+   1048              }
+   1049          
+   1050              return (ret_ptr);
+   \                     ??tcbDequeuePriority_1:
+   \   00002F BE ..        LDW       X, S:?w1
+   \   000031 81           RET
+   1051          }
+   1052          
+   1053          
+   1054          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      11  atomCurrentContext
+       2  atomIdleThread
+       2  atomIntCnt
+       8  atomIntEnter
+      10  atomIntExit
+      37  atomOSInit
+      22  atomOSStart
+       1  atomOSStarted
+     146  atomSched
+     209  atomThreadCreate
+      25  atomThreadSwitch
+       2  curr_tcb
+      18  idle_tcb
+     138  tcbDequeueEntry
+      51  tcbDequeueHead
+      50  tcbDequeuePriority
+     123  tcbEnqueuePriority
+       2  tcbReadyQ
+
+ 
+  25 bytes in section .near.bss
+ 832 bytes in section .near_func.text
+ 
+ 832 bytes of CODE memory
+  25 bytes of DATA memory
+
+Errors: none
+Warnings: 1

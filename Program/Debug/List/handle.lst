@@ -1,0 +1,266 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 03/Mar/2019  20:55:09
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\User\handle.c
+#    Command line =  
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\User\handle.c" -e
+#        -Ol --no_cse --no_unroll --no_inline --no_code_motion --no_tbaa
+#        --no_cross_call --debug --code_model small --data_model medium -o
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\Debug\Obj"
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD -lCN
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\Debug\List" -I
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\AtomOS1.3\kernel\"
+#        -I "C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\AtomOS1.3\ports\stm8\" -I "C:\Users\Wesley\Desktop\JBC\PCB
+#        version\JBC AtomOS\User\" --vregs 16
+#    List file    =  
+#        C:\Users\Wesley\Desktop\JBC\PCB version\JBC
+#        AtomOS\Debug\List\handle.lst
+#    Object file  =  
+#        C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\Debug\Obj\handle.o
+#
+###############################################################################
+
+C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\User\handle.c
+      1          #include "stm8l15x.h"
+      2          #include "handle.h"
+      3          #include "thermalcouple.h"
+      4          #include "pid.h"
+      5          
+      6          
+
+   \                                 In section .near.bss, align 1
+      7          uint16_t HANDLE_TemperatureRaw = 0;
+   \                     HANDLE_TemperatureRaw:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+      8          uint16_t HANDLE_Temperature = 0;
+   \                     HANDLE_Temperature:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+      9          uint16_t HANDLE_TipTemperatureRaw = 0;
+   \                     HANDLE_TipTemperatureRaw:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+     10          uint16_t HANDLE_TipTemperature = 0;
+   \                     HANDLE_TipTemperature:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+     11          uint16_t HANDLE_CurrentRaw = 0;
+   \                     HANDLE_CurrentRaw:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+     12          uint16_t HANDLE_Current = 0;
+   \                     HANDLE_Current:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+     13          uint16_t HANDLE_VoltageRaw = 0;
+   \                     HANDLE_VoltageRaw:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+     14          uint16_t HANDLE_Voltage = 0;
+   \                     HANDLE_Voltage:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+     15          uint16_t HANDLE_ID = 0;
+   \                     HANDLE_ID:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+     16          uint16_t HANDLE_Reference = 0;
+   \                     HANDLE_Reference:
+   \   000000              DS8 2
+
+   \                                 In section .near.data, align 1
+     17          uint16_t HANDLE_TipSetpoint = 150;
+   \                     HANDLE_TipSetpoint:
+   \   000000 0096         DC16 150
+
+   \                                 In section .near.bss, align 1
+     18          FlagStatus HANDLE_UpdateFlag = RESET;
+   \                     HANDLE_UpdateFlag:
+   \   000000              DS8 1
+     19          
+
+   \                                 In section .near_func.text, align 1
+     20          void HANDLE_Init(void)
+     21          {
+     22            GPIO_Init(HANDLE_SLEEP_GPIO,HANDLE_SLEEP_PIN,GPIO_Mode_In_PU_No_IT);                     
+   \                     HANDLE_Init:
+   \   000000 35 40 ....   MOV       S:?b0, #0x40
+   \   000004 A6 40        LD        A, #0x40
+   \   000006 AE 500A      LDW       X, #0x500a
+   \   000009 CD ....      CALL      L:GPIO_Init
+     23            GPIO_Init(HANDLE_CHANGE_GPIO,HANDLE_CHANGE_PIN,GPIO_Mode_In_PU_No_IT);                     
+   \   00000C 35 40 ....   MOV       S:?b0, #0x40
+   \   000010 A6 20        LD        A, #0x20
+   \   000012 AE 500A      LDW       X, #0x500a
+   \   000015 CC ....      JP        L:GPIO_Init
+     24            
+     25          }
+     26          
+     27          
+     28          
+     29          
+     30          
+     31          
+     32          
+
+   \                                 In section .near_func.text, align 1
+     33          void HANDLE_SleepDetect(void)
+     34          {
+     35            static int8_t debounce_cnt = 0;
+     36            static uint16_t setpoint_reg = 0;
+     37            static FlagStatus handle_sleep = SET;
+     38            static FlagStatus handle_sleep_last = SET;
+     39            
+     40            if(GPIO_ReadInputDataBit(HANDLE_SLEEP_GPIO,HANDLE_SLEEP_PIN))
+   \                     HANDLE_SleepDetect:
+   \   000000 A6 40        LD        A, #0x40
+   \   000002 AE 500A      LDW       X, #0x500a
+   \   000005 CD ....      CALL      L:GPIO_ReadInputDataBit
+   \   000008 A1 00        CP        A, #0x0
+   \   00000A 27 1A        JREQ      L:??HANDLE_SleepDetect_0
+     41            {
+     42              debounce_cnt++;
+   \   00000C A6 01        LD        A, #0x1
+   \   00000E CB ....      ADD       A, L:??debounce_cnt
+   \   000011 C7 ....      LD        L:??debounce_cnt, A
+     43              if(debounce_cnt > 20)
+   \   000014 AE ....      LDW       X, #??debounce_cnt
+   \   000017 F6           LD        A, (X)
+   \   000018 A1 15        CP        A, #0x15
+   \   00001A 2F 22        JRSLT     L:??HANDLE_SleepDetect_1
+     44              {
+     45                debounce_cnt = 0;
+   \   00001C 35 00 ....   MOV       L:??debounce_cnt, #0x0
+     46                handle_sleep = RESET;
+   \   000020 35 00 ....   MOV       L:??handle_sleep, #0x0
+   \   000024 20 18        JRA       L:??HANDLE_SleepDetect_1
+     47              }
+     48            }
+     49            else
+     50            {
+     51              debounce_cnt--;
+   \                     ??HANDLE_SleepDetect_0:
+   \   000026 A6 FF        LD        A, #0xffffffffffffffff
+   \   000028 CB ....      ADD       A, L:??debounce_cnt
+   \   00002B C7 ....      LD        L:??debounce_cnt, A
+     52              if(debounce_cnt<-20)
+   \   00002E AE ....      LDW       X, #??debounce_cnt
+   \   000031 F6           LD        A, (X)
+   \   000032 A1 EC        CP        A, #0xffffffffffffffec
+   \   000034 2E 08        JRSGE     L:??HANDLE_SleepDetect_1
+     53              {
+     54                debounce_cnt = 0;
+   \   000036 35 00 ....   MOV       L:??debounce_cnt, #0x0
+     55                handle_sleep = SET;
+   \   00003A 35 01 ....   MOV       L:??handle_sleep, #0x1
+     56              }
+     57            }
+     58            
+     59            if(handle_sleep_last != handle_sleep)
+   \                     ??HANDLE_SleepDetect_1:
+   \   00003E AE ....      LDW       X, #??handle_sleep
+   \   000041 F6           LD        A, (X)
+   \   000042 C1 ....      CP        A, L:??handle_sleep_last
+   \   000045 27 11        JREQ      L:??HANDLE_SleepDetect_2
+     60            {
+     61              handle_sleep_last = handle_sleep;
+   \   000047 55 .... .... MOV       L:??handle_sleep_last, L:??handle_sleep
+     62              if(handle_sleep)
+   \   00004C C6 ....      LD        A, L:??handle_sleep
+   \   00004F 4D           TNZ       A
+   \   000050 27 06        JREQ      L:??HANDLE_SleepDetect_2
+     63              {
+     64                 setpoint_reg = HANDLE_TipSetpoint;
+   \   000052 CE ....      LDW       X, L:HANDLE_TipSetpoint
+   \   000055 CF ....      LDW       L:??setpoint_reg, X
+     65               //  HANDLE_TipSetpoint = DEFAULT_HANDLE_SLEEP_SETPOINT;
+     66                // JBC_Windows = Window_Sleeping;
+     67              }
+     68              else
+     69              {
+     70               // if(setpoint_reg > DEFAULT_HANDLE_SLEEP_SETPOINT)
+     71              //  {
+     72                //  HANDLE_TipSetpoint = setpoint_reg;
+     73                  
+     74              //  }
+     75               // JBC_Windows = Window_Working;
+     76              }
+     77            }
+     78            
+     79          }
+   \                     ??HANDLE_SleepDetect_2:
+   \   000058 81           RET
+
+   \                                 In section .near.bss, align 1
+   \                     ??debounce_cnt:
+   \   000000              DS8 1
+
+   \                                 In section .near.bss, align 1
+   \                     ??setpoint_reg:
+   \   000000              DS8 2
+
+   \                                 In section .near.data, align 1
+   \                     ??handle_sleep:
+   \   000000 01           DC8 1
+
+   \                                 In section .near.data, align 1
+   \                     ??handle_sleep_last:
+   \   000000 01           DC8 1
+     80          
+     81          
+     82          
+     83          
+     84          
+     85          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       2  HANDLE_Current
+       2  HANDLE_CurrentRaw
+       2  HANDLE_ID
+      24  HANDLE_Init
+       2  HANDLE_Reference
+      89  HANDLE_SleepDetect
+       2  HANDLE_Temperature
+       2  HANDLE_TemperatureRaw
+       2  HANDLE_TipSetpoint
+       2  HANDLE_TipTemperature
+       2  HANDLE_TipTemperatureRaw
+       1  HANDLE_UpdateFlag
+       2  HANDLE_Voltage
+       2  HANDLE_VoltageRaw
+       1  debounce_cnt
+       1  handle_sleep
+       1  handle_sleep_last
+       2  setpoint_reg
+
+ 
+  24 bytes in section .near.bss
+   4 bytes in section .near.data
+ 113 bytes in section .near_func.text
+ 
+ 113 bytes of CODE memory
+  28 bytes of DATA memory
+
+Errors: none
+Warnings: 1

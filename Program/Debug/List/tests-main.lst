@@ -1,0 +1,1011 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 21/Jul/2020  22:32:37
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\AtomOS1.3\ports\stm8\tests-main.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\AtomOS1.3\ports\stm8\tests-main.c" -e -Om --no_unroll
+#        --no_inline --no_tbaa --no_cross_call --debug --code_model small
+#        --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\tests-main.lst
+#    Object file  =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\tests-main.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\tests-main.c
+      1          /*
+      2           * Copyright (c) 2010, Kelvin Lawson. All rights reserved.
+      3           *
+      4           * Redistribution and use in source and binary forms, with or without
+      5           * modification, are permitted provided that the following conditions
+      6           * are met:
+      7           *
+      8           * 1. Redistributions of source code must retain the above copyright
+      9           *    notice, this list of conditions and the following disclaimer.
+     10           * 2. Redistributions in binary form must reproduce the above copyright
+     11           *    notice, this list of conditions and the following disclaimer in the
+     12           *    documentation and/or other materials provided with the distribution.
+     13           * 3. No personal names or organizations' names associated with the
+     14           *    Atomthreads project may be used to endorse or promote products
+     15           *    derived from this software without specific prior written permission.
+     16           *
+     17           * THIS SOFTWARE IS PROVIDED BY THE ATOMTHREADS PROJECT AND CONTRIBUTORS
+     18           * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+     19           * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+     20           * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE
+     21           * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     22           * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     23           * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     24           * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     25           * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     26           * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     27           * POSSIBILITY OF SUCH DAMAGE.
+     28           */
+     29          
+     30          
+     31          #include <stdio.h>
+     32          
+     33          #include "atom.h"
+     34          #include "atomport-private.h"
+     35          #include "atomport-tests.h"
+     36          #include "atomtests.h"
+     37          #include "atomtimer.h"
+     38          #include "uart.h"
+     39          #include "stm8l15x.h"
+     40          #include "stm8l15x_gpio.h"
+     41          
+     42          #include "lcd19264.h"
+     43          #include "system.h"
+     44          #include "encoder.h"
+     45          #include "ui.h"
+     46          #include "nrf24l01.h"
+     47          #include "ppm.h"
+     48          #include "adc.h"
+     49             #include "joystick.h"
+     50          /* Constants */
+     51          
+     52          /*
+     53           * Idle thread stack size
+     54           *
+     55           * This needs to be large enough to handle any interrupt handlers
+     56           * and callbacks called by interrupt handlers (e.g. user-created
+     57           * timer callbacks) as well as the saving of all context when
+     58           * switching away from this thread.
+     59           *
+     60           * In this case, the idle stack is allocated on the BSS via the
+     61           * idle_thread_stack[] byte array.
+     62           */
+     63          #define IDLE_STACK_SIZE_BYTES       128
+     64          
+     65          
+     66          /*
+     67           * Main thread stack size
+     68           *
+     69           * Note that this is not a required OS kernel thread - you will replace
+     70           * this with your own application thread.
+     71           *
+     72           * In this case the Main thread is responsible for calling out to the
+     73           * test routines. Once a test routine has finished, the test status is
+     74           * printed out on the UART and the thread remains running in a loop
+     75           * flashing a LED.
+     76           *
+     77           * The Main thread stack generally needs to be larger than the idle
+     78           * thread stack, as not only does it need to store interrupt handler
+     79           * stack saves and context switch saves, but the application main thread
+     80           * will generally be carrying out more nested function calls and require
+     81           * stack for application code local variables etc.
+     82           *
+     83           * With all OS tests implemented to date on the STM8, the Main thread
+     84           * stack has not exceeded 384 bytes. To allow all tests to run we set
+     85           * a minimum main thread stack size of 204 bytes. This may increase in
+     86           * future as the codebase changes but for the time being is enough to
+     87           * cope with all of the automated tests.
+     88           */
+     89          #define MAIN_STACK_SIZE_BYTES       256
+     90          #define ANALOG_STACK_SIZE_BYTES       256
+     91          #define DISPLAY_STACK_SIZE_BYTES       128
+     92          #define COMMUNICATION_STACK_SIZE_BYTES       128
+     93          /*
+     94           * Startup code stack
+     95           *
+     96           * Some stack space is required at initial startup for running the main()
+     97           * routine. This stack space is only temporarily required at first bootup
+     98           * and is no longer required as soon as the OS is started. By default
+     99           * Cosmic sets this to the top of RAM and it grows down from there.
+    100           *
+    101           * Because we only need this temporarily you may reuse the area once the
+    102           * OS is started, and are free to use some area other than the top of RAM.
+    103           * For convenience we just use the default region here.
+    104           */
+    105          
+    106          
+    107          /* Local data */
+    108          
+    109          /* Application threads' TCBs */
+
+   \                                 In section .near.bss, align 1
+    110          static ATOM_TCB main_tcb;
+   \                     main_tcb:
+   \   000000              DS8 18
+
+   \                                 In section .near.bss, align 1
+    111          static ATOM_TCB analog_tcb;
+   \                     analog_tcb:
+   \   000000              DS8 18
+
+   \                                 In section .near.bss, align 1
+    112          static ATOM_TCB display_tcb;
+   \                     display_tcb:
+   \   000000              DS8 18
+
+   \                                 In section .near.bss, align 1
+    113          static ATOM_TCB communication_tcb;
+   \                     communication_tcb:
+   \   000000              DS8 18
+    114          /* Main thread's stack area (large so place outside of the small page0 area on STM8) */
+
+   \                                 In section .near.bss, align 1
+    115          NEAR static uint8_t main_thread_stack[MAIN_STACK_SIZE_BYTES];
+   \                     main_thread_stack:
+   \   000000              DS8 256
+
+   \                                 In section .near.bss, align 1
+    116          NEAR static uint8_t analog_thread_stack[ANALOG_STACK_SIZE_BYTES];
+   \                     analog_thread_stack:
+   \   000000              DS8 256
+
+   \                                 In section .near.bss, align 1
+    117          NEAR static uint8_t display_thread_stack[DISPLAY_STACK_SIZE_BYTES];
+   \                     display_thread_stack:
+   \   000000              DS8 128
+
+   \                                 In section .near.bss, align 1
+    118          NEAR static uint8_t communication_thread_stack[COMMUNICATION_STACK_SIZE_BYTES];
+   \                     communication_thread_stack:
+   \   000000              DS8 128
+    119          /* Idle thread's stack area (large so place outside of the small page0 area on STM8) */
+
+   \                                 In section .near.bss, align 1
+    120          NEAR static uint8_t idle_thread_stack[IDLE_STACK_SIZE_BYTES];
+   \                     idle_thread_stack:
+   \   000000              DS8 128
+    121          
+    122          
+    123          /* Forward declarations */
+    124          static void main_thread_func (uint32_t param);
+    125          static void analog_thread_func (uint32_t param);
+    126          static void display_thread_func (uint32_t param);
+    127          static void communication_thread_func (uint32_t param);
+    128          /**
+    129           * \b main
+    130           *
+    131           * Program entry point.
+    132           *
+    133           * Sets up the STM8 hardware resources (system tick timer interrupt) necessary
+    134           * for the OS to be started. Creates an application thread and starts the OS.
+    135           *
+    136           * If the compiler supports it, stack space can be saved by preventing
+    137           * the function from saving registers on entry. This is because we
+    138           * are called directly by the C startup assembler, and know that we will
+    139           * never return from here. The NO_REG_SAVE macro is used to denote such 
+    140           * functions in a compiler-agnostic way, though not all compilers support it.
+    141           *
+    142           */
+
+   \                                 In section .near_func.text, align 1
+    143          NO_REG_SAVE void main ( void )
+    144          {
+    145              int8_t status;
+    146          
+    147              /**
+    148               * Note: to protect OS structures and data during initialisation,
+    149               * interrupts must remain disabled until the first thread
+    150               * has been restored. They are reenabled at the very end of
+    151               * the first thread restore, at which point it is safe for a
+    152               * reschedule to take place.
+    153               */
+    154          
+    155              /* Initialise the OS before creating our threads */
+    156              status = atomOSInit(&idle_thread_stack[0], IDLE_STACK_SIZE_BYTES, TRUE);
+   \                     main:
+   \   000000 A6 01        LD        A, #0x1
+   \   000002 AE 0080      LDW       X, #0x80
+   \   000005 BF ..        LDW       S:?w1, X
+   \   000007 5F           CLRW      X
+   \   000008 BF ..        LDW       S:?w0, X
+   \   00000A AE ....      LDW       X, #idle_thread_stack
+   \   00000D CD ....      CALL      L:atomOSInit
+    157              if (status == ATOM_OK)
+   \   000010 4D           TNZ       A
+   \   000011 26 2D        JRNE      L:??main_0
+    158              {
+    159                  /* Enable the system tick timer */
+    160                  archInitSystemTickTimer();
+   \   000013 CD ....      CALL      L:archInitSystemTickTimer
+    161          
+    162                  /* Create an application thread */
+    163                  status = atomThreadCreate(&main_tcb,
+    164                               TEST_THREAD_PRIO, main_thread_func, 0,
+    165                               &main_thread_stack[0],
+    166                               MAIN_STACK_SIZE_BYTES,
+    167                               TRUE);
+   \   000016 4B 00        PUSH      #0x0
+   \   000018 4B 01        PUSH      #0x1
+   \   00001A 4B 00        PUSH      #0x0
+   \   00001C 4B 00        PUSH      #0x0
+   \   00001E 35 01 ....   MOV       S:?b6, #0x1
+   \   000022 AE ....      LDW       X, #main_thread_stack
+   \   000025 BF ..        LDW       S:?w2, X
+   \   000027 5F           CLRW      X
+   \   000028 BF ..        LDW       S:?w1, X
+   \   00002A BF ..        LDW       S:?w0, X
+   \   00002C 90AE ....    LDW       Y, #main_thread_func
+   \   000030 A6 10        LD        A, #0x10
+   \   000032 AE ....      LDW       X, #main_tcb
+   \   000035 CD ....      CALL      L:atomThreadCreate
+   \   000038 5B 04        ADD       SP, #0x4
+    168                  if (status == ATOM_OK)
+   \   00003A 4D           TNZ       A
+   \   00003B 26 03        JRNE      L:??main_0
+    169                  {
+    170                      /**
+    171                       * First application thread successfully created. It is
+    172                       * now possible to start the OS. Execution will not return
+    173                       * from atomOSStart(), which will restore the context of
+    174                       * our application thread and start executing it.
+    175                       *
+    176                       * Note that interrupts are still disabled at this point.
+    177                       * They will be enabled as we restore and execute our first
+    178                       * thread in archFirstThreadRestore().
+    179                       */
+    180                      atomOSStart();
+   \   00003D CD ....      CALL      L:atomOSStart
+    181                  }
+    182              }
+    183          
+    184              /* There was an error starting the OS if we reach here */
+    185              while (1)
+   \                     ??main_0:
+   \   000040 20 FE        JRA       L:??main_0
+    186              {
+    187              }
+    188          
+    189          }
+    190          
+
+   \                                 In section .near_func.text, align 1
+    191          static void analog_thread_func (uint32_t param)
+    192          {
+   \                     analog_thread_func:
+   \   000000 CD ....      CALL      L:?push_l2
+    193            char cnt = 0;
+    194            JoystickInit();
+   \   000003 CD ....      CALL      L:JoystickInit
+    195            printf("------------------------------------------\n");
+   \   000006 AE ....      LDW       X, #?_0
+   \   000009 CD ....      CALL      L:printf
+   \   00000C 20 0B        JRA       L:??analog_thread_func_0
+    196            while(1)
+    197            {
+    198              
+    199              if(SYSTEM_ADC_UpdateFlag)  
+    200              {
+    201                SYSTEM_ADC_UpdateFlag = RESET;
+    202                
+    203                for(cnt = 0;cnt<8;cnt++)
+    204                {
+    205                  if(cnt < 4)
+    206                  {
+    207                    JoystickChannel[cnt].ChannelData = JOYSTICK_Update(ADC_Results+1+cnt,JoystickChannel[cnt].JoystickType,JoystickChannel[cnt].ChannelReverseFlag);
+    208                
+    209                  }
+    210                  else
+    211                  {
+    212                    JoystickChannel[cnt].ChannelData = JOYSTICK_Update(ADC_Results+2+cnt,JoystickChannel[cnt].JoystickType,JoystickChannel[cnt].ChannelReverseFlag);
+    213                
+    214                  }
+    215                }
+    216                
+    217                //
+    218              }
+    219             
+    220              atomTimerDelay (50);
+   \                     ??analog_thread_func_1:
+   \   00000E AE 0032      LDW       X, #0x32
+   \   000011 BF ..        LDW       S:?w1, X
+   \   000013 5F           CLRW      X
+   \   000014 BF ..        LDW       S:?w0, X
+   \   000016 CD ....      CALL      L:atomTimerDelay
+   \                     ??analog_thread_func_0:
+   \   000019 C6 ....      LD        A, L:SYSTEM_ADC_UpdateFlag
+   \   00001C 27 F0        JREQ      L:??analog_thread_func_1
+   \   00001E 725F ....    CLR       L:SYSTEM_ADC_UpdateFlag
+   \   000022 3F ..        CLR       S:?b11
+   \   000024 20 15        JRA       L:??analog_thread_func_2
+   \                     ??analog_thread_func_3:
+   \   000026 90F6         LD        A, (Y)
+   \   000028 B7 ..        LD        S:?b0, A
+   \   00002A 92C6 ..      LD        A, [S:?w1.w]
+   \   00002D 1C 0004      ADDW      X, #0x4
+   \   000030 CD ....      CALL      L:JOYSTICK_Update
+   \   000033 92CF ..      LDW       [S:?w4.w], X
+   \                     ??analog_thread_func_4:
+   \   000036 B6 ..        LD        A, S:?b11
+   \   000038 4C           INC       A
+   \   000039 B7 ..        LD        S:?b11, A
+   \                     ??analog_thread_func_2:
+   \   00003B B6 ..        LD        A, S:?b11
+   \   00003D A1 08        CP        A, #0x8
+   \   00003F 24 CD        JRNC      L:??analog_thread_func_1
+   \   000041 3F ..        CLR       S:?b10
+   \   000043 AE 0006      LDW       X, #0x6
+   \   000046 BF ..        LDW       S:?w0, X
+   \   000048 BE ..        LDW       X, S:?w5
+   \   00004A CD ....      CALL      L:?mul16_x_x_w0
+   \   00004D 1C ....      ADDW      X, #JoystickChannel
+   \   000050 BF ..        LDW       S:?w1, X
+   \   000052 1C 0004      ADDW      X, #0x4
+   \   000055 BF ..        LDW       S:?w4, X
+   \   000057 BE ..        LDW       X, S:?w1
+   \   000059 5C           INCW      X
+   \   00005A 9093         LDW       Y, X
+   \   00005C BE ..        LDW       X, S:?w5
+   \   00005E 58           SLLW      X
+   \   00005F 1C ....      ADDW      X, #ADC_Results
+   \   000062 A1 04        CP        A, #0x4
+   \   000064 24 C0        JRNC      L:??analog_thread_func_3
+   \   000066 90F6         LD        A, (Y)
+   \   000068 B7 ..        LD        S:?b0, A
+   \   00006A 92C6 ..      LD        A, [S:?w1.w]
+   \   00006D 1C 0002      ADDW      X, #0x2
+   \   000070 CD ....      CALL      L:JOYSTICK_Update
+   \   000073 92CF ..      LDW       [S:?w4.w], X
+   \   000076 20 BE        JRA       L:??analog_thread_func_4
+    221            }
+    222            
+    223            
+    224          }
+    225          
+
+   \                                 In section .near_func.text, align 1
+    226          static void display_thread_func (uint32_t param)
+    227          {
+   \                     display_thread_func:
+   \   000000 CD ....      CALL      L:?push_l2
+    228            char cnt = 0;
+    229            char menu_last; 
+    230            UI_Init();
+   \   000003 CD ....      CALL      L:UI_Init
+   \   000006 20 29        JRA       L:??display_thread_func_0
+    231            while(1)
+    232            {
+    233              if(menu_last != MenuList.Page)
+    234              {
+    235                LCD_ClearScreen(0);
+    236                menu_last = MenuList.Page;
+    237              }
+    238              switch(MenuList.Page)
+    239              {
+    240              case 0:
+    241                for(cnt = 0;cnt<8;cnt++)
+    242                {
+    243                 
+    244                    LCD_Put6x8Char(0,cnt,cnt+48);
+    245                    if(JoystickChannel[cnt].ChannelData & CHANNEL_NEGATIVE_SIGN)
+    246                    {
+    247                      LCD_Put6x8Char(12,cnt,'-');
+    248                    }
+    249                    else
+    250                    {
+    251                      LCD_Put6x8Char(12,cnt,' ');
+    252                    }
+    253                    LCD_Put6x8IntNumber(18,cnt,JoystickChannel[cnt].ChannelData & 0x0fff);
+    254                    if(JoystickChannel[cnt].ChannelData&AUTO_ZERO_TYPE)   //auto zero type
+    255                    {
+    256                      if(JoystickChannel[cnt].ChannelData & CHANNEL_NEGATIVE_SIGN)
+    257                      {
+    258                        LCD_Draw8BitBar(60,127,cnt,(33 - (JoystickChannel[cnt].ChannelData & 0x0fff)/57));
+    259                      }
+    260                      else
+    261                      {
+    262                        LCD_Draw8BitBar(60,127,cnt,(33 + (JoystickChannel[cnt].ChannelData & 0x0fff)/57));
+    263                      }
+    264                      
+    265                    }
+    266                    else
+    267                    {
+    268                      LCD_Draw8BitBar(60,127,cnt,(JoystickChannel[cnt].ChannelData & 0x0fff)/66);
+    269                    }
+    270                    
+    271                }
+    272                break;
+    273              case 1:
+    274                LCD_Put8x16Str(0,4,"Window 1");
+    275                break;
+    276              case 2:
+    277                LCD_Put8x16Str(0,4,"Window 2");
+    278                break;
+    279              case 3:
+    280                LCD_Put8x16Str(0,4,"Window 3");
+    281                break;
+    282              case 4:
+    283                LCD_Put8x16Str(10,4,"Powering off...");
+    284                break;
+    285              default:
+    286                LCD_Put8x16Str(0,4,"Default");
+   \                     ??display_thread_func_1:
+   \   000008 AE ....      LDW       X, #?_5
+   \   00000B 35 04 ....   MOV       S:?b0, #0x4
+   \   00000F 4F           CLR       A
+   \   000010 CD ....      CALL      L:LCD_Put8x16Str
+    287                break;
+    288              }
+    289                
+    290                
+    291              LCD_LightIconBattery((ADC_Results[5]-1862)/186,ENABLE);
+   \                     ??display_thread_func_2:
+   \   000013 35 01 ....   MOV       S:?b0, #0x1
+   \   000017 CE ....      LDW       X, L:ADC_Results + 10
+   \   00001A 1C F8BA      ADDW      X, #0xf8ba
+   \   00001D 90AE 00BA    LDW       Y, #0xba
+   \   000021 65           DIVW      X, Y
+   \   000022 9F           LD        A, XL
+   \   000023 CD ....      CALL      L:LCD_LightIconBattery
+    292              
+    293              atomTimerDelay (20);
+   \   000026 AE 0014      LDW       X, #0x14
+   \   000029 BF ..        LDW       S:?w1, X
+   \   00002B 5F           CLRW      X
+   \   00002C BF ..        LDW       S:?w0, X
+   \   00002E CD ....      CALL      L:atomTimerDelay
+   \                     ??display_thread_func_0:
+   \   000031 B6 ..        LD        A, S:?b10
+   \   000033 C1 ....      CP        A, L:MenuList + 1
+   \   000036 27 09        JREQ      L:??display_thread_func_3
+   \   000038 4F           CLR       A
+   \   000039 CD ....      CALL      L:LCD_ClearScreen
+   \   00003C 55 .... .... MOV       S:?b10, L:MenuList + 1
+   \                     ??display_thread_func_3:
+   \   000041 AE ....      LDW       X, #MenuList + 1
+   \   000044 F6           LD        A, (X)
+   \   000045 27 1A        JREQ      L:??display_thread_func_4
+   \   000047 4A           DEC       A
+   \   000048 26 03        JRNE      ??lb_0
+   \   00004A CC ....      JP        L:??display_thread_func_5
+   \                     ??lb_0:
+   \   00004D 4A           DEC       A
+   \   00004E 26 03        JRNE      ??lb_1
+   \   000050 CC ....      JP        L:??display_thread_func_6
+   \                     ??lb_1:
+   \   000053 4A           DEC       A
+   \   000054 26 03        JRNE      ??lb_2
+   \   000056 CC ....      JP        L:??display_thread_func_7
+   \                     ??lb_2:
+   \   000059 4A           DEC       A
+   \   00005A 26 03        JRNE      ??lb_3
+   \   00005C CC ....      JP        L:??display_thread_func_8
+   \                     ??lb_3:
+   \   00005F 20 A7        JRA       L:??display_thread_func_1
+   \                     ??display_thread_func_4:
+   \   000061 3F ..        CLR       S:?b11
+   \   000063 20 1E        JRA       L:??display_thread_func_9
+   \                     ??display_thread_func_10:
+   \   000065 AE 0042      LDW       X, #0x42
+   \   000068 BF ..        LDW       S:?w0, X
+   \   00006A 93           LDW       X, Y
+   \   00006B 90BE ..      LDW       Y, S:?w0
+   \   00006E 65           DIVW      X, Y
+   \   00006F 41           EXG       A, XL
+   \   000070 B7 ..        LD        S:?b2, A
+   \   000072 45 .. ..     MOV       S:?b1, S:?b11
+   \   000075 35 7F ....   MOV       S:?b0, #0x7f
+   \   000079 A6 3C        LD        A, #0x3c
+   \   00007B CD ....      CALL      L:LCD_Draw8BitBar
+   \                     ??display_thread_func_11:
+   \   00007E B6 ..        LD        A, S:?b11
+   \   000080 4C           INC       A
+   \   000081 B7 ..        LD        S:?b11, A
+   \                     ??display_thread_func_9:
+   \   000083 B6 ..        LD        A, S:?b11
+   \   000085 A1 08        CP        A, #0x8
+   \   000087 24 8A        JRNC      L:??display_thread_func_2
+   \   000089 AB 30        ADD       A, #0x30
+   \   00008B B7 ..        LD        S:?b1, A
+   \   00008D 45 .. ..     MOV       S:?b0, S:?b11
+   \   000090 4F           CLR       A
+   \   000091 CD ....      CALL      L:LCD_Put6x8Char
+   \   000094 905F         CLRW      Y
+   \   000096 B6 ..        LD        A, S:?b11
+   \   000098 9097         LD        YL, A
+   \   00009A AE 0006      LDW       X, #0x6
+   \   00009D BF ..        LDW       S:?w0, X
+   \   00009F 93           LDW       X, Y
+   \   0000A0 CD ....      CALL      L:?mul16_x_x_w0
+   \   0000A3 1C ....      ADDW      X, #JoystickChannel + 4
+   \   0000A6 BF ..        LDW       S:?w4, X
+   \   0000A8 92CE ..      LDW       X, [S:?w4.w]
+   \   0000AB 02           RLWA      X, A
+   \   0000AC A4 80        AND       A, #0x80
+   \   0000AE 02           RLWA      X, A
+   \   0000AF 4F           CLR       A
+   \   0000B0 02           RLWA      X, A
+   \   0000B1 5D           TNZW      X
+   \   0000B2 27 0E        JREQ      L:??display_thread_func_12
+   \   0000B4 35 2D ....   MOV       S:?b1, #0x2d
+   \   0000B8 45 .. ..     MOV       S:?b0, S:?b11
+   \   0000BB A6 0C        LD        A, #0xc
+   \   0000BD CD ....      CALL      L:LCD_Put6x8Char
+   \   0000C0 20 0C        JRA       L:??display_thread_func_13
+   \                     ??display_thread_func_12:
+   \   0000C2 35 20 ....   MOV       S:?b1, #0x20
+   \   0000C6 45 .. ..     MOV       S:?b0, S:?b11
+   \   0000C9 A6 0C        LD        A, #0xc
+   \   0000CB CD ....      CALL      L:LCD_Put6x8Char
+   \                     ??display_thread_func_13:
+   \   0000CE 92CE ..      LDW       X, [S:?w4.w]
+   \   0000D1 02           RLWA      X, A
+   \   0000D2 A4 0F        AND       A, #0xf
+   \   0000D4 01           RRWA      X, A
+   \   0000D5 45 .. ..     MOV       S:?b0, S:?b11
+   \   0000D8 A6 12        LD        A, #0x12
+   \   0000DA CD ....      CALL      L:LCD_Put6x8IntNumber
+   \   0000DD 92CE ..      LDW       X, [S:?w4.w]
+   \   0000E0 BF ..        LDW       S:?w1, X
+   \   0000E2 02           RLWA      X, A
+   \   0000E3 A4 0F        AND       A, #0xf
+   \   0000E5 01           RRWA      X, A
+   \   0000E6 9093         LDW       Y, X
+   \   0000E8 BE ..        LDW       X, S:?w1
+   \   0000EA 02           RLWA      X, A
+   \   0000EB A4 40        AND       A, #0x40
+   \   0000ED 02           RLWA      X, A
+   \   0000EE 4F           CLR       A
+   \   0000EF 02           RLWA      X, A
+   \   0000F0 5D           TNZW      X
+   \   0000F1 26 03        JRNE      ??lb_4
+   \   0000F3 CC ....      JP        L:??display_thread_func_10
+   \                     ??lb_4:
+   \   0000F6 AE 0039      LDW       X, #0x39
+   \   0000F9 BF ..        LDW       S:?w0, X
+   \   0000FB 93           LDW       X, Y
+   \   0000FC 90BE ..      LDW       Y, S:?w0
+   \   0000FF 65           DIVW      X, Y
+   \   000100 41           EXG       A, XL
+   \   000101 B7 ..        LD        S:?b0, A
+   \   000103 41           EXG       A, XL
+   \   000104 BE ..        LDW       X, S:?w1
+   \   000106 02           RLWA      X, A
+   \   000107 A4 80        AND       A, #0x80
+   \   000109 02           RLWA      X, A
+   \   00010A 4F           CLR       A
+   \   00010B 02           RLWA      X, A
+   \   00010C 5D           TNZW      X
+   \   00010D 27 15        JREQ      L:??display_thread_func_14
+   \   00010F A6 21        LD        A, #0x21
+   \   000111 B0 ..        SUB       A, S:?b0
+   \   000113 B7 ..        LD        S:?b2, A
+   \   000115 45 .. ..     MOV       S:?b1, S:?b11
+   \   000118 35 7F ....   MOV       S:?b0, #0x7f
+   \   00011C A6 3C        LD        A, #0x3c
+   \   00011E CD ....      CALL      L:LCD_Draw8BitBar
+   \   000121 CC ....      JP        L:??display_thread_func_11
+   \                     ??display_thread_func_14:
+   \   000124 B6 ..        LD        A, S:?b0
+   \   000126 AB 21        ADD       A, #0x21
+   \   000128 B7 ..        LD        S:?b2, A
+   \   00012A 45 .. ..     MOV       S:?b1, S:?b11
+   \   00012D 35 7F ....   MOV       S:?b0, #0x7f
+   \   000131 A6 3C        LD        A, #0x3c
+   \   000133 CD ....      CALL      L:LCD_Draw8BitBar
+   \   000136 CC ....      JP        L:??display_thread_func_11
+   \                     ??display_thread_func_5:
+   \   000139 AE ....      LDW       X, #?_1
+   \   00013C 35 04 ....   MOV       S:?b0, #0x4
+   \   000140 4F           CLR       A
+   \   000141 CD ....      CALL      L:LCD_Put8x16Str
+   \   000144 CC ....      JP        L:??display_thread_func_2
+   \                     ??display_thread_func_6:
+   \   000147 AE ....      LDW       X, #?_2
+   \   00014A 35 04 ....   MOV       S:?b0, #0x4
+   \   00014E 4F           CLR       A
+   \   00014F CD ....      CALL      L:LCD_Put8x16Str
+   \   000152 CC ....      JP        L:??display_thread_func_2
+   \                     ??display_thread_func_7:
+   \   000155 AE ....      LDW       X, #?_3
+   \   000158 35 04 ....   MOV       S:?b0, #0x4
+   \   00015C 4F           CLR       A
+   \   00015D CD ....      CALL      L:LCD_Put8x16Str
+   \   000160 CC ....      JP        L:??display_thread_func_2
+   \                     ??display_thread_func_8:
+   \   000163 AE ....      LDW       X, #?_4
+   \   000166 35 04 ....   MOV       S:?b0, #0x4
+   \   00016A A6 0A        LD        A, #0xa
+   \   00016C CD ....      CALL      L:LCD_Put8x16Str
+   \   00016F CC ....      JP        L:??display_thread_func_2
+    294            }
+    295            
+    296            
+    297          }
+    298          
+    299          
+
+   \                                 In section .near_func.text, align 1
+    300          static void communication_thread_func (uint32_t param)
+    301          {
+    302            uint8_t nrf_status,command_received = 0;
+   \                     communication_thread_func:
+   \   000000 20 3B        JRA       L:??communication_thread_func_0
+    303            uint8_t cnt;
+    304            while(1)
+    305            {
+    306              
+    307          //    JoystickChannel[0].ChannelData = nrf_tx_pipe[0][0]<<8;
+    308          //    JoystickChannel[0].ChannelData |= nrf_tx_pipe[0][1];
+    309          //    
+    310          //    JoystickChannel[1].ChannelData = nrf_tx_pipe[0][2]<<8;
+    311          //    JoystickChannel[1].ChannelData |= nrf_tx_pipe[0][3];
+    312          //    
+    313          //    JoystickChannel[2].ChannelData = nrf_tx_pipe[0][4]<<8;
+    314          //    JoystickChannel[2].ChannelData |= nrf_tx_pipe[0][5];
+    315          //    
+    316          //    JoystickChannel[3].ChannelData = nrf_tx_pipe[0][6]<<8;
+    317          //    JoystickChannel[3].ChannelData |= nrf_tx_pipe[0][7];
+    318              
+    319              for(cnt = 0; cnt<8; cnt++)
+    320              {
+    321                nrf_tx_pipe[0][cnt*2] = (JoystickChannel[cnt].ChannelData)>>8;
+   \                     ??communication_thread_func_1:
+   \   000002 3F ..        CLR       S:?b2
+   \   000004 AE 0006      LDW       X, #0x6
+   \   000007 BF ..        LDW       S:?w0, X
+   \   000009 BE ..        LDW       X, S:?w1
+   \   00000B CD ....      CALL      L:?mul16_x_x_w0
+   \   00000E 1C ....      ADDW      X, #JoystickChannel + 4
+   \   000011 FE           LDW       X, (X)
+   \   000012 9093         LDW       Y, X
+   \   000014 BE ..        LDW       X, S:?w1
+   \   000016 58           SLLW      X
+   \   000017 1C ....      ADDW      X, #nrf_tx_pipe
+   \   00001A 909E         LD        A, YH
+   \   00001C F7           LD        (X), A
+    322                nrf_tx_pipe[0][cnt*2+1] = JoystickChannel[cnt].ChannelData &0x00ff;
+   \   00001D 909F         LD        A, YL
+   \   00001F 5C           INCW      X
+   \   000020 F7           LD        (X), A
+    323              }
+   \   000021 B6 ..        LD        A, S:?b3
+   \   000023 4C           INC       A
+   \   000024 B7 ..        LD        S:?b3, A
+   \                     ??communication_thread_func_2:
+   \   000026 B6 ..        LD        A, S:?b3
+   \   000028 A1 08        CP        A, #0x8
+   \   00002A 25 D6        JRC       L:??communication_thread_func_1
+    324          //    nrf_tx_pipe[0][0] = (JoystickChannel[0].ChannelData &0x0fff)>>8;
+    325          //    nrf_tx_pipe[0][1] = JoystickChannel[0].ChannelData &0x00ff;
+    326          //    nrf_tx_pipe[0][2] = (JoystickChannel[1].ChannelData &0x0fff)>>8;
+    327          //    nrf_tx_pipe[0][3] = JoystickChannel[1].ChannelData &0x00ff;
+    328          //    nrf_tx_pipe[0][4] = (JoystickChannel[2].ChannelData &0x0fff)>>8;
+    329          //    nrf_tx_pipe[0][5] = JoystickChannel[2].ChannelData &0x00ff;
+    330          //    nrf_tx_pipe[0][6] = (JoystickChannel[3].ChannelData &0x0fff)>>8;
+    331          //    nrf_tx_pipe[0][7] = JoystickChannel[3].ChannelData &0x00ff;
+    332              
+    333              NRF24L01_TxPacket(nrf_tx_pipe[0]);
+   \   00002C AE ....      LDW       X, #nrf_tx_pipe
+   \   00002F CD ....      CALL      L:NRF24L01_TxPacket
+    334             
+    335              atomTimerDelay (50);
+   \   000032 AE 0032      LDW       X, #0x32
+   \   000035 BF ..        LDW       S:?w1, X
+   \   000037 5F           CLRW      X
+   \   000038 BF ..        LDW       S:?w0, X
+   \   00003A CD ....      CALL      L:atomTimerDelay
+   \                     ??communication_thread_func_0:
+   \   00003D 3F ..        CLR       S:?b3
+   \   00003F 20 E5        JRA       L:??communication_thread_func_2
+    336            }
+    337            
+    338            
+    339          }
+    340          /**
+    341           * \b main_thread_func
+    342           *
+    343           * Entry point for main application thread.
+    344           *
+    345           * This is the first thread that will be executed when the OS is started.
+    346           *
+    347           * @param[in] param Unused (optional thread entry parameter)
+    348           *
+    349           * @return None
+    350           */
+
+   \                                 In section .near_func.text, align 1
+    351          static void main_thread_func (uint32_t param)
+    352          {
+    353              int8_t status;
+    354              uint8_t tx_buf[10]="channelone";
+    355              /* Compiler warnings */
+    356              param = param;
+    357              /* Initialise UART (9600bps) */
+    358              if (uart_init(115200) != 0)
+   \                     main_thread_func:
+   \   000000 AE C200      LDW       X, #0xc200
+   \   000003 BF ..        LDW       S:?w1, X
+   \   000005 5F           CLRW      X
+   \   000006 5C           INCW      X
+   \   000007 BF ..        LDW       S:?w0, X
+   \   000009 CD ....      CALL      L:uart_init
+    359              {
+    360                  /* Error initialising UART */
+    361              }
+    362          
+    363              /* Put a message out on the UART */
+    364              printf ("Go\n");
+   \   00000C AE ....      LDW       X, #?_6
+   \   00000F CD ....      CALL      L:printf
+    365              ENCODER_Init();
+   \   000012 CD ....      CALL      L:ENCODER_Init
+    366              PPM_Init();
+   \   000015 CD ....      CALL      L:PPM_Init
+    367              SYSTEM_Init();
+   \   000018 CD ....      CALL      L:SYSTEM_Init
+    368              UI_Init();
+   \   00001B CD ....      CALL      L:UI_Init
+    369              NRF24L01_Init();
+   \   00001E CD ....      CALL      L:NRF24L01_Init
+    370              LCD19264_Init();
+   \   000021 CD ....      CALL      L:LCD19264_Init
+    371              Analog_Init();
+   \   000024 CD ....      CALL      L:Analog_Init
+    372              
+    373              status = atomThreadCreate(&display_tcb,
+    374                               TEST_THREAD_PRIO, display_thread_func, 0,
+    375                               &display_thread_stack[0],
+    376                               DISPLAY_STACK_SIZE_BYTES,
+    377                               TRUE);
+   \   000027 4B 80        PUSH      #0x80
+   \   000029 4B 00        PUSH      #0x0
+   \   00002B 4B 00        PUSH      #0x0
+   \   00002D 4B 00        PUSH      #0x0
+   \   00002F 35 01 ....   MOV       S:?b6, #0x1
+   \   000033 AE ....      LDW       X, #display_thread_stack
+   \   000036 BF ..        LDW       S:?w2, X
+   \   000038 5F           CLRW      X
+   \   000039 BF ..        LDW       S:?w1, X
+   \   00003B BF ..        LDW       S:?w0, X
+   \   00003D 90AE ....    LDW       Y, #display_thread_func
+   \   000041 A6 10        LD        A, #0x10
+   \   000043 AE ....      LDW       X, #display_tcb
+   \   000046 CD ....      CALL      L:atomThreadCreate
+   \   000049 5B 04        ADD       SP, #0x4
+    378              
+    379              status = atomThreadCreate(&analog_tcb,
+    380                               TEST_THREAD_PRIO, analog_thread_func, 0,
+    381                               &analog_thread_stack[0],
+    382                               ANALOG_STACK_SIZE_BYTES,
+    383                               TRUE);
+   \   00004B 4B 00        PUSH      #0x0
+   \   00004D 4B 01        PUSH      #0x1
+   \   00004F 4B 00        PUSH      #0x0
+   \   000051 4B 00        PUSH      #0x0
+   \   000053 35 01 ....   MOV       S:?b6, #0x1
+   \   000057 AE ....      LDW       X, #analog_thread_stack
+   \   00005A BF ..        LDW       S:?w2, X
+   \   00005C 5F           CLRW      X
+   \   00005D BF ..        LDW       S:?w1, X
+   \   00005F BF ..        LDW       S:?w0, X
+   \   000061 90AE ....    LDW       Y, #analog_thread_func
+   \   000065 A6 10        LD        A, #0x10
+   \   000067 AE ....      LDW       X, #analog_tcb
+   \   00006A CD ....      CALL      L:atomThreadCreate
+   \   00006D 5B 04        ADD       SP, #0x4
+    384              
+    385              status = atomThreadCreate(&communication_tcb,
+    386                               TEST_THREAD_PRIO, communication_thread_func, 0,
+    387                               &communication_thread_stack[0],
+    388                               COMMUNICATION_STACK_SIZE_BYTES,
+    389                               TRUE);
+   \   00006F 4B 80        PUSH      #0x80
+   \   000071 4B 00        PUSH      #0x0
+   \   000073 4B 00        PUSH      #0x0
+   \   000075 4B 00        PUSH      #0x0
+   \   000077 35 01 ....   MOV       S:?b6, #0x1
+   \   00007B AE ....      LDW       X, #communication_thread_stack
+   \   00007E BF ..        LDW       S:?w2, X
+   \   000080 5F           CLRW      X
+   \   000081 BF ..        LDW       S:?w1, X
+   \   000083 BF ..        LDW       S:?w0, X
+   \   000085 90AE ....    LDW       Y, #communication_thread_func
+   \   000089 A6 10        LD        A, #0x10
+   \   00008B AE ....      LDW       X, #communication_tcb
+   \   00008E CD ....      CALL      L:atomThreadCreate
+   \   000091 5B 04        ADD       SP, #0x4
+   \   000093 20 31        JRA       L:??main_thread_func_0
+    390          
+    391              
+    392              while (1)
+    393              {
+    394                
+    395                if(SYSTEM_ReadPowerKey() == RESET)
+    396                {
+    397                  atomTimerDelay (100);
+    398                  if(SYSTEM_ReadPowerKey() != RESET)
+    399                  {
+    400                    MenuList.Page++;
+    401                    if(MenuList.Page == MenuList.PageMax - 1)
+    402                    {
+    403                      MenuList.Page = 0;
+    404                    }
+    405                  }
+    406                  else
+    407                  {
+    408                    atomTimerDelay (500);
+   \                     ??main_thread_func_1:
+   \   000095 AE 01F4      LDW       X, #0x1f4
+   \   000098 BF ..        LDW       S:?w1, X
+   \   00009A 5F           CLRW      X
+   \   00009B BF ..        LDW       S:?w0, X
+   \   00009D CD ....      CALL      L:atomTimerDelay
+    409                    if(SYSTEM_ReadPowerKey()== RESET)
+   \   0000A0 A6 40        LD        A, #0x40
+   \   0000A2 AE 5014      LDW       X, #0x5014
+   \   0000A5 CD ....      CALL      L:GPIO_ReadInputDataBit
+   \   0000A8 A1 00        CP        A, #0x0
+   \   0000AA 26 11        JRNE      L:??main_thread_func_2
+    410                    {
+    411                      MenuList.Page = MenuList.PageMax;
+   \   0000AC 55 .... .... MOV       L:MenuList + 1, L:MenuList + 2
+    412                      TIM2_CtrlPWMOutputs(DISABLE);
+   \   0000B1 4F           CLR       A
+   \   0000B2 CD ....      CALL      L:TIM2_CtrlPWMOutputs
+    413                      SYSTEM_PowerOff();
+   \   0000B5 A6 80        LD        A, #0x80
+   \   0000B7 AE 5014      LDW       X, #0x5014
+   \   0000BA CD ....      CALL      L:GPIO_ResetBits
+    414                    }
+    415                  }
+    416                }
+    417             
+    418          //          switch(SystemVariables.SystemKey)
+    419          //          {
+    420          //            case Key_Push:
+    421          //              ENCODER_BeeperBeep(5);
+    422          //              NRF24L01_TxPacket(tx_buf);
+    423          //              break;
+    424          //            case Key_Increase:
+    425          //            case Key_Decrease:
+    426          //              
+    427          //              ENCODER_BeeperClickSound();
+    428          //              
+    429          //              break;
+    430          //            default:
+    431          //              break;
+    432          //          }
+    433                   // SystemVariables.SystemKey = Key_Null;
+    434                 //   UI_KeyProcess(&SystemVariables.SystemKey);
+    435                  /* Sleep then toggle LED again */
+    436                  atomTimerDelay (1);
+   \                     ??main_thread_func_2:
+   \   0000BD 5F           CLRW      X
+   \   0000BE BF ..        LDW       S:?w0, X
+   \   0000C0 5C           INCW      X
+   \   0000C1 BF ..        LDW       S:?w1, X
+   \   0000C3 CD ....      CALL      L:atomTimerDelay
+   \                     ??main_thread_func_0:
+   \   0000C6 A6 40        LD        A, #0x40
+   \   0000C8 AE 5014      LDW       X, #0x5014
+   \   0000CB CD ....      CALL      L:GPIO_ReadInputDataBit
+   \   0000CE A1 00        CP        A, #0x0
+   \   0000D0 26 EB        JRNE      L:??main_thread_func_2
+   \   0000D2 AE 0064      LDW       X, #0x64
+   \   0000D5 BF ..        LDW       S:?w1, X
+   \   0000D7 5F           CLRW      X
+   \   0000D8 BF ..        LDW       S:?w0, X
+   \   0000DA CD ....      CALL      L:atomTimerDelay
+   \   0000DD A6 40        LD        A, #0x40
+   \   0000DF AE 5014      LDW       X, #0x5014
+   \   0000E2 CD ....      CALL      L:GPIO_ReadInputDataBit
+   \   0000E5 A1 00        CP        A, #0x0
+   \   0000E7 27 AC        JREQ      L:??main_thread_func_1
+   \   0000E9 A6 01        LD        A, #0x1
+   \   0000EB CB ....      ADD       A, L:MenuList + 1
+   \   0000EE B7 ..        LD        S:?b1, A
+   \   0000F0 C7 ....      LD        L:MenuList + 1, A
+   \   0000F3 C6 ....      LD        A, L:MenuList + 2
+   \   0000F6 5F           CLRW      X
+   \   0000F7 97           LD        XL, A
+   \   0000F8 5A           DECW      X
+   \   0000F9 3F ..        CLR       S:?b0
+   \   0000FB B3 ..        CPW       X, S:?w0
+   \   0000FD 26 BE        JRNE      L:??main_thread_func_2
+   \   0000FF 725F ....    CLR       L:MenuList + 1
+   \   000103 20 B8        JRA       L:??main_thread_func_2
+    437              }
+    438          }
+
+   \                                 In section .near.rodata, align 1
+   \                     ?_0:
+   \   000000 2D 2D 2D 2D  DC8 "------------------------------------------\012"
+   \          2D 2D 2D 2D 
+
+   \                                 In section .near.rodata, align 1
+   \                     ?_1:
+   \   000000 57 69 6E 64  DC8 "Window 1"
+   \          6F 77 20 31 
+
+   \                                 In section .near.rodata, align 1
+   \                     ?_2:
+   \   000000 57 69 6E 64  DC8 "Window 2"
+   \          6F 77 20 32 
+
+   \                                 In section .near.rodata, align 1
+   \                     ?_3:
+   \   000000 57 69 6E 64  DC8 "Window 3"
+   \          6F 77 20 33 
+
+   \                                 In section .near.rodata, align 1
+   \                     ?_4:
+   \   000000 50 6F 77 65  DC8 "Powering off..."
+   \          72 69 6E 67 
+
+   \                                 In section .near.rodata, align 1
+   \                     ?_5:
+   \   000000 44 65 66 61  DC8 "Default"
+   \          75 6C 74 00 
+
+   \                                 In section .near.rodata, align 1
+   \                     ?_6:
+   \   000000 47 6F 0A 00  DC8 "Go\012"
+    439          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      44  ?_0
+       9  ?_1
+       9  ?_2
+       9  ?_3
+      16  ?_4
+       8  ?_5
+       4  ?_6
+      18  analog_tcb
+     120  analog_thread_func
+     256  analog_thread_stack
+      18  communication_tcb
+      65  communication_thread_func
+     128  communication_thread_stack
+      18  display_tcb
+     370  display_thread_func
+     128  display_thread_stack
+     128  idle_thread_stack
+      66  main
+      18  main_tcb
+     261  main_thread_func
+     256  main_thread_stack
+
+ 
+ 968 bytes in section .near.bss
+  99 bytes in section .near.rodata
+ 882 bytes in section .near_func.text
+ 
+ 882 bytes of CODE  memory
+  99 bytes of CONST memory
+ 968 bytes of DATA  memory
+
+Errors: none
+Warnings: 5

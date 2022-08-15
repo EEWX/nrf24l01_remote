@@ -1,0 +1,81 @@
+[Stack]
+FillEnabled=0
+OverflowWarningsEnabled=1
+WarningThreshold=90
+SpWarningsEnabled=1
+WarnLogOnly=1
+UseTrigger=1
+TriggerName=main
+LimitSize=0
+ByteLimit=50
+[DebugChecksum]
+Checksum=-506643034
+[CodeCoverage]
+Enabled=_ 0
+[CallStack]
+ShowArgs=0
+[Disassembly]
+MixedMode=1
+[DriverProfiling]
+Enabled=0
+Mode=1
+Graph=0
+Symbiont=0
+Exclusions=
+[CallStackLog]
+Enabled=0
+[CallStackStripe]
+ShowTiming=1
+[InterruptLog]
+LogEnabled=0
+GraphEnabled=0
+ShowTimeLog=1
+SumEnabled=0
+ShowTimeSum=1
+SumSortOrder=0
+[DataLog]
+LogEnabled=0
+GraphEnabled=0
+ShowTimeLog=1
+SumEnabled=0
+ShowTimeSum=1
+[Breakpoints2]
+Bp0=_ 0 "STD_CODE2" "{$PROJ_DIR$\AtomOS1.3\ports\stm8\tests-main.c}.149.9" 0 0 1 "" 0 ""
+Bp1=_ 0 "STD_CODE2" "{$PROJ_DIR$\AtomOS1.3\ports\stm8\tests-main.c}.198.5" 0 0 1 "" 0 ""
+Count=2
+[Interrupts]
+Enabled=1
+[MemoryMap]
+Enabled=0
+Base=0
+UseAuto=0
+TypeViolation=1
+UnspecRange=1
+ActionState=1
+[Trace1]
+Enabled=0
+ShowSource=1
+[Simulator]
+Freq=16000000
+[DataSample]
+LogEnabled=0
+GraphEnabled=0
+ShowTimeLog=1
+[Log file]
+LoggingEnabled=_ 0
+LogFile=_ ""
+Category=_ 0
+[TermIOLog]
+LoggingEnabled=_ 0
+LogFile=_ ""
+[Breakpoints]
+Count=0
+[Aliases]
+A0=_ "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\AtomOS1.3\kernel\atomkernel.c" "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\AtomOS1.3\kernel\atomkernel.c"
+A1=_ "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\AtomOS1.3\ports\stm8\atomport.c" "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\AtomOS1.3\ports\stm8\atomport.c"
+A2=_ "C:\Users\wesley\Desktop\JBC STM8L151\AtomOS1.3\ports\stm8\tests-main.c" "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\AtomOS1.3\ports\stm8\tests-main.c"
+A3=_ "C:\Users\wesley\Desktop\JBC STM8L151\AtomOS1.3\ports\stm8\uart.c" "C:\Users\Wesley\Desktop\JBC\PCB version\JBC AtomOS\AtomOS1.3\ports\stm8\uart.c"
+Count=4
+SuppressDialog=1
+[DebuggerSettings]
+DisableInterruptsWhenStepping=0

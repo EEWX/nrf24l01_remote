@@ -1,0 +1,555 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 29/Dec/2019  15:37:35
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\NTC.c
+#    Command line =  
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\NTC.c" -e
+#        -Ol --no_cse --no_unroll --no_inline --no_code_motion --no_tbaa
+#        --no_cross_call --debug --code_model small --data_model medium -o
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\Obj"
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD -lCN
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\List" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\AtomOS1.3\kernel\" -I "C:\Users\Administrator\Desktop\My
+#        Design\JBC AtomOS\AtomOS1.3\ports\stm8\" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\" --vregs 16
+#    List file    =  
+#        C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\List\NTC.lst
+#    Object file  =  
+#        C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\Obj\NTC.o
+#
+###############################################################################
+
+C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\NTC.c
+      1          #include "stm8l15x.h"
+      2          #include "ntc.h"
+      3          
+      4          //-------------TE 10K3A1--------------------
+
+   \                                 In section .near.rodata, align 1
+      5          const uint16_t NTC_10K_TABLE[111]=
+   \                     NTC_10K_TABLE:
+   \   000000 7F8B 7937    DC16 32651, 31031, 29500, 28054, 26687, 25395, 24172, 23016, 21921
+   \          733C 6D96   
+   \   000012 5195 4DBF    DC16 20885, 19903, 18973, 18092, 17257, 16465, 15714, 15001, 14324
+   \          4A1D 46AC   
+   \   000024 3572 3311    DC16 13682, 13073, 12493, 11943, 11420, 10923, 10450, 10000, 9572, 9165
+   \          30CD 2EA7   
+   \   000038 2249 20D8    DC16 8777, 8408, 8056, 7721, 7402, 7097, 6807, 6530, 6266, 6014, 5774
+   \          1F78 1E29   
+   \   00004E 15A8 14CD    DC16 5544, 5325, 5116, 4916, 4724, 4542, 4367, 4200, 4040, 3887, 3741
+   \          13FC 1334   
+   \   000064 0E11 0D8B    DC16 3601, 3467, 3339, 3216, 3098, 2985, 2877, 2773, 2674, 2579, 2487
+   \          0D0B 0C90   
+   \   00007A 095F 090B    DC16 2399, 2315, 2234, 2157, 2082, 2011, 1942, 1876, 1813, 1752, 1693
+   \          08BA 086D   
+   \   000090 0665 062E    DC16 1637, 1582, 1530, 1480, 1432, 1385, 1341, 1298, 1256, 1216, 1178
+   \          05FA 05C8   
+   \   0000A6 0475 0451    DC16 1141, 1105, 1070, 1037, 1005, 974, 945, 916, 888, 862, 836, 811
+   \          042E 040D   
+   \   0000BE 0313 02FC    DC16 787, 764, 741, 720, 699, 678, 659, 640, 622, 604, 587, 571, 555
+   \          02E5 02D0   
+   \   0000D8 021B 020C    DC16 539, 524, 510
+   \          01FE        
+      6          {
+      7              32651,//0
+      8              31031,
+      9              29500,
+     10              28054,
+     11              26687,
+     12              25395,
+     13              24172,
+     14              23016,
+     15              21921,
+     16              20885,
+     17              19903,//10
+     18              18973,
+     19              18092,
+     20              17257,
+     21              16465,
+     22              15714,
+     23              15001,
+     24              14324,
+     25              13682,
+     26              13073,
+     27              12493,//20
+     28              11943,
+     29              11420,
+     30              10923,
+     31              10450,
+     32              10000,
+     33              9572,
+     34              9165,
+     35              8777,
+     36              8408,
+     37              8056,//30
+     38              7721,
+     39              7402,
+     40              7097,
+     41              6807,
+     42              6530,
+     43              6266,
+     44              6014,
+     45              5774,
+     46              5544,
+     47              5325,//40
+     48              5116,//
+     49              4916,
+     50              4724,
+     51              4542,
+     52              4367,
+     53              4200,
+     54              4040,
+     55              3887,
+     56              3741,
+     57              3601,//50
+     58              3467,
+     59              3339,
+     60              3216,
+     61              3098,
+     62              2985,
+     63              2877,
+     64              2773,
+     65              2674,
+     66              2579,
+     67              2487,//60
+     68              2399,
+     69              2315,
+     70              2234,
+     71              2157,
+     72              2082,
+     73              2011,
+     74              1942,
+     75              1876,
+     76              1813,
+     77              1752,//70
+     78              1693,
+     79              1637,
+     80              1582,
+     81              1530,
+     82              1480,
+     83              1432,
+     84              1385,
+     85              1341,
+     86              1298,
+     87              1256,//80
+     88              1216,
+     89              1178,
+     90              1141,
+     91              1105,
+     92              1070,
+     93              1037,
+     94              1005,
+     95              974,
+     96              945,
+     97              916,//90
+     98              888,
+     99              862,
+    100              836,
+    101              811,
+    102              787,
+    103              764,
+    104              741,
+    105              720,
+    106              699,
+    107              678,//100
+    108              659,
+    109              640,
+    110              622,
+    111              604,
+    112              587,
+    113              571,
+    114              555,
+    115              539,
+    116              524,
+    117              510 //110
+    118          
+    119          };
+    120          
+    121          //-------------MURATA NCP15WF104D03RC, valueX10--------------------
+
+   \                                 In section .near.rodata, align 1
+    122          const uint16_t NTC_100K_TABLE[111]=
+   \                     NTC_100K_TABLE:
+   \   000000 8B0D 83AE    DC16 35597, 33710, 31934, 30262, 28686, 27201, 25800, 24480, 23234
+   \          7CBE 7636   
+   \   000012 562B 51D5    DC16 22059, 20949, 19901, 18911, 17976, 17092, 16256, 15465, 14718
+   \          4DBD 49DF   
+   \   000024 36BA 341C    DC16 14010, 13340, 12706, 12105, 11536, 10996, 10485, 10000, 9540, 9103
+   \          31A2 2F49   
+   \   000038 21F1 2068    DC16 8689, 8296, 7922, 7568, 7231, 6910, 6606, 6317, 6041, 5780, 5531
+   \          1EF2 1D90   
+   \   00004E 14AD 13CC    DC16 5293, 5068, 4853, 4648, 4453, 4267, 4090, 3921, 3760, 3606, 3459
+   \          12F5 1228   
+   \   000064 0CF7 0C72    DC16 3319, 3186, 3058, 2936, 2820, 2709, 2602, 2501, 2404, 2311, 2222
+   \          0BF2 0B78   
+   \   00007A 0859 0808    DC16 2137, 2056, 1978, 1904, 1832, 1764, 1698, 1636, 1576, 1518, 1463
+   \          07BA 0770   
+   \   000090 0582 054F    DC16 1410, 1359, 1310, 1263, 1219, 1176, 1134, 1095, 1056, 1020, 985
+   \          051E 04EF   
+   \   0000A6 03B7 0396    DC16 951, 918, 887, 857, 828, 801, 774, 748, 723, 700, 677, 655, 634
+   \          0377 0359   
+   \   0000C0 0265 0251    DC16 613, 593, 574, 556, 538, 521, 505, 489, 474, 459, 445, 431, 418
+   \          023E 022C   
+   \   0000DA 0196 0189    DC16 406, 393
+    123          {
+    124              35597,//0
+    125              33710,
+    126              31934,
+    127              30262,
+    128              28686,
+    129              27201,
+    130              25800,
+    131              24480,
+    132              23234,
+    133              22059,
+    134              20949,//10
+    135              19901,
+    136              18911,
+    137              17976,
+    138              17092,
+    139              16256,
+    140              15465,
+    141              14718,
+    142              14010,
+    143              13340,
+    144              12706,//20
+    145              12105,
+    146              11536,
+    147              10996,
+    148              10485,
+    149              10000,
+    150              9540,
+    151              9103,
+    152              8689,
+    153              8296,
+    154              7922,//30
+    155              7568,
+    156              7231,
+    157              6910,
+    158              6606,
+    159              6317,
+    160              6041,
+    161              5780,
+    162              5531,
+    163              5293,
+    164              5068,//40
+    165              4853,//
+    166              4648,
+    167              4453,
+    168              4267,
+    169              4090,
+    170              3921,
+    171              3760,
+    172              3606,
+    173              3459,
+    174              3319,//50
+    175              3186,
+    176              3058,
+    177              2936,
+    178              2820,
+    179              2709,
+    180              2602,
+    181              2501,
+    182              2404,
+    183              2311,
+    184              2222,//60
+    185              2137,
+    186              2056,
+    187              1978,
+    188              1904,
+    189              1832,
+    190              1764,
+    191              1698,
+    192              1636,
+    193              1576,
+    194              1518,//70
+    195              1463,
+    196              1410,
+    197              1359,
+    198              1310,
+    199              1263,
+    200              1219,
+    201              1176,
+    202              1134,
+    203              1095,
+    204              1056,//80
+    205              1020,
+    206              985,
+    207              951,
+    208              918,
+    209              887,
+    210              857,
+    211              828,
+    212              801,
+    213              774,
+    214              748,//90
+    215              723,
+    216              700,
+    217              677,
+    218              655,
+    219              634,
+    220              613,
+    221              593,
+    222              574,
+    223              556,
+    224              538,//100
+    225              521,
+    226              505,
+    227              489,
+    228              474,
+    229              459,
+    230              445,
+    231              431,
+    232              418,
+    233              406,
+    234              393 //110
+    235          
+    236          };
+    237          
+    238          
+    239          
+
+   \                                 In section .near_func.text, align 1
+    240          uint16_t NTC_ResistorToTemperature(uint16_t const *table,uint32_t resistor)
+    241          {
+   \                     NTC_ResistorToTemperature:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 BF ..        LDW       S:?w7, X
+   \   000008 CD ....      CALL      L:?mov_l2_l0
+    242              uint8_t index;
+    243              uint16_t temp = 0xffff;
+   \   00000B 5F           CLRW      X
+   \   00000C 5A           DECW      X
+   \   00000D 9093         LDW       Y, X
+    244              uint8_t percent;
+    245              for(index=0;index<109;index++)
+   \   00000F 3F ..        CLR       S:?b13
+   \   000011 20 06        JRA       L:??NTC_ResistorToTemperature_0
+   \                     ??NTC_ResistorToTemperature_1:
+   \   000013 B6 ..        LD        A, S:?b13
+   \   000015 AB 01        ADD       A, #0x1
+   \   000017 B7 ..        LD        S:?b13, A
+   \                     ??NTC_ResistorToTemperature_0:
+   \   000019 B6 ..        LD        A, S:?b13
+   \   00001B A1 6D        CP        A, #0x6d
+   \   00001D 25 03        JRC       ??lb_0
+   \   00001F CC ....      JP        L:??NTC_ResistorToTemperature_2
+    246              {
+    247                  if(resistor == *(table+index))
+   \                     ??lb_0:
+   \   000022 5F           CLRW      X
+   \   000023 B6 ..        LD        A, S:?b13
+   \   000025 97           LD        XL, A
+   \   000026 58           SLLW      X
+   \   000027 72BB ....    ADDW      X, S:?w7
+   \   00002B FE           LDW       X, (X)
+   \   00002C BF ..        LDW       S:?w3, X
+   \   00002E 5F           CLRW      X
+   \   00002F BF ..        LDW       S:?w2, X
+   \   000031 CD ....      CALL      L:?mov_l0_l2
+   \   000034 CD ....      CALL      L:?ucmp32_c_l0_l1
+   \   000037 26 11        JRNE      L:??NTC_ResistorToTemperature_3
+    248                  {
+    249                      temp = index*10;
+   \   000039 3F ..        CLR       S:?b12
+   \   00003B AE 000A      LDW       X, #0xa
+   \   00003E BF ..        LDW       S:?w0, X
+   \   000040 BE ..        LDW       X, S:?w6
+   \   000042 CD ....      CALL      L:?mul16_x_x_w0
+   \   000045 9093         LDW       Y, X
+    250                      break;
+   \   000047 CC ....      JP        L:??NTC_ResistorToTemperature_2
+    251                  }
+    252                  else if(resistor<*(table+index) && resistor>*(table+index+1))
+   \                     ??NTC_ResistorToTemperature_3:
+   \   00004A 5F           CLRW      X
+   \   00004B B6 ..        LD        A, S:?b13
+   \   00004D 97           LD        XL, A
+   \   00004E 58           SLLW      X
+   \   00004F 72BB ....    ADDW      X, S:?w7
+   \   000053 FE           LDW       X, (X)
+   \   000054 BF ..        LDW       S:?w3, X
+   \   000056 5F           CLRW      X
+   \   000057 BF ..        LDW       S:?w2, X
+   \   000059 CD ....      CALL      L:?mov_l0_l2
+   \   00005C CD ....      CALL      L:?ucmp32_c_l0_l1
+   \   00005F 24 B2        JRNC      L:??NTC_ResistorToTemperature_1
+   \   000061 5F           CLRW      X
+   \   000062 B6 ..        LD        A, S:?b13
+   \   000064 97           LD        XL, A
+   \   000065 58           SLLW      X
+   \   000066 72BB ....    ADDW      X, S:?w7
+   \   00006A 5C           INCW      X
+   \   00006B 5C           INCW      X
+   \   00006C FE           LDW       X, (X)
+   \   00006D BF ..        LDW       S:?w1, X
+   \   00006F 5F           CLRW      X
+   \   000070 BF ..        LDW       S:?w0, X
+   \   000072 CD ....      CALL      L:?mov_l1_l2
+   \   000075 CD ....      CALL      L:?ucmp32_c_l0_l1
+   \   000078 24 99        JRNC      L:??NTC_ResistorToTemperature_1
+    253                  {
+    254                      percent = (*(table+index) - resistor)*10/(*(table+index) - *(table+index+1));
+   \   00007A 5F           CLRW      X
+   \   00007B B6 ..        LD        A, S:?b13
+   \   00007D 97           LD        XL, A
+   \   00007E 58           SLLW      X
+   \   00007F 72BB ....    ADDW      X, S:?w7
+   \   000083 5C           INCW      X
+   \   000084 5C           INCW      X
+   \   000085 FE           LDW       X, (X)
+   \   000086 BF ..        LDW       S:?w0, X
+   \   000088 5F           CLRW      X
+   \   000089 B6 ..        LD        A, S:?b13
+   \   00008B 97           LD        XL, A
+   \   00008C 58           SLLW      X
+   \   00008D 72BB ....    ADDW      X, S:?w7
+   \   000091 FE           LDW       X, (X)
+   \   000092 72B0 ....    SUBW      X, S:?w0
+   \   000096 BF ..        LDW       S:?w1, X
+   \   000098 5F           CLRW      X
+   \   000099 BF ..        LDW       S:?w0, X
+   \   00009B CD ....      CALL      L:?push_l0
+   \   00009E 5F           CLRW      X
+   \   00009F B6 ..        LD        A, S:?b13
+   \   0000A1 97           LD        XL, A
+   \   0000A2 58           SLLW      X
+   \   0000A3 72BB ....    ADDW      X, S:?w7
+   \   0000A7 FE           LDW       X, (X)
+   \   0000A8 BF ..        LDW       S:?w1, X
+   \   0000AA 5F           CLRW      X
+   \   0000AB BF ..        LDW       S:?w0, X
+   \   0000AD CD ....      CALL      L:?mov_l1_l2
+   \   0000B0 CD ....      CALL      L:?sub32_l0_l0_l1
+   \   0000B3 CD ....      CALL      L:?mul32_l0_l0_dl
+   \   0000B6 0000000A     DC32      0xa
+   \   0000BA CD ....      CALL      L:?pop_l1
+   \   0000BD CD ....      CALL      L:?udiv32_l0_l0_l1
+    255                      temp = index*10 + percent;
+   \   0000C0 3F ..        CLR       S:?b12
+   \   0000C2 AE 000A      LDW       X, #0xa
+   \   0000C5 BF ..        LDW       S:?w0, X
+   \   0000C7 BE ..        LDW       X, S:?w6
+   \   0000C9 CD ....      CALL      L:?mul16_x_x_w0
+   \   0000CC 3F ..        CLR       S:?b2
+   \   0000CE 72BB ....    ADDW      X, S:?w1
+   \   0000D2 9093         LDW       Y, X
+    256                      break;
+    257                  }
+    258                  
+    259              }
+    260              return(temp);
+   \                     ??NTC_ResistorToTemperature_2:
+   \   0000D4 93           LDW       X, Y
+   \   0000D5 CC ....      JP        L:?epilogue_l2_l3
+    261          }
+    262          
+    263          
+    264          //------------voltage is 1000 times bigger
+
+   \                                 In section .near_func.text, align 1
+    265          uint16_t NTC_VoltageToResistor(uint16_t reference,uint16_t r_pull,uint16_t voltage)
+    266          {
+   \                     NTC_VoltageToResistor:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 BF ..        LDW       S:?w1, X
+   \   000005 CD ....      CALL      L:?mov_w3_w0
+    267              uint32_t temp = voltage;
+   \   000008 5F           CLRW      X
+   \   000009 BF ..        LDW       S:?w2, X
+    268              return(r_pull*temp/(reference-temp));
+   \   00000B 5F           CLRW      X
+   \   00000C BF ..        LDW       S:?w0, X
+   \   00000E CD ....      CALL      L:?sub32_l0_l0_l1
+   \   000011 CD ....      CALL      L:?mov_l2_l0
+   \   000014 90BF ..      LDW       S:?w1, Y
+   \   000017 5F           CLRW      X
+   \   000018 BF ..        LDW       S:?w0, X
+   \   00001A CD ....      CALL      L:?mul32_l0_l0_l1
+   \   00001D CD ....      CALL      L:?mov_l1_l2
+   \   000020 CD ....      CALL      L:?udiv32_l0_l0_l1
+   \   000023 BE ..        LDW       X, S:?w1
+   \   000025 CC ....      JP        L:?epilogue_l2
+    269          }
+    270          
+    271          //---------------used for condition where sensor divider voltage and vref are same, adc 12bit-----------------
+
+   \                                 In section .near_func.text, align 1
+    272          uint16_t NTC_CountToTemperature(uint32_t r_pullup,uint16_t count)
+    273          {
+   \                     NTC_CountToTemperature:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_l3
+   \   000006 CD ....      CALL      L:?mov_l2_l0
+   \   000009 BF ..        LDW       S:?w3, X
+    274            uint32_t temp = r_pullup;
+   \   00000B CD ....      CALL      L:?mov_l0_l2
+    275            temp = temp*count/(4096-count);
+   \   00000E AE 1000      LDW       X, #0x1000
+   \   000011 72B0 ....    SUBW      X, S:?w3
+   \   000015 BF ..        LDW       S:?w7, X
+   \   000017 5F           CLRW      X
+   \   000018 BF ..        LDW       S:?w6, X
+   \   00001A 5F           CLRW      X
+   \   00001B BF ..        LDW       S:?w2, X
+   \   00001D CD ....      CALL      L:?mov_l2_l0
+   \   000020 CD ....      CALL      L:?mov_l0_l1
+   \   000023 CD ....      CALL      L:?mov_l1_l2
+   \   000026 CD ....      CALL      L:?mul32_l0_l0_l1
+   \   000029 CD ....      CALL      L:?mov_l1_l3
+   \   00002C CD ....      CALL      L:?udiv32_l0_l0_l1
+    276            if(r_pullup < 100000)
+   \   00002F BE ..        LDW       X, S:?w4
+   \   000031 A3 0001      CPW       X, #0x1
+   \   000034 26 05        JRNE      L:??NTC_CountToTemperature_0
+   \   000036 BE ..        LDW       X, S:?w5
+   \   000038 A3 86A0      CPW       X, #0x86a0
+   \                     ??NTC_CountToTemperature_0:
+   \   00003B 24 09        JRNC      L:??NTC_CountToTemperature_1
+    277            {
+    278              return(NTC_ResistorToTemperature(NTC_10K_TABLE,temp));
+   \   00003D AE ....      LDW       X, #NTC_10K_TABLE
+   \   000040 CD ....      CALL      L:NTC_ResistorToTemperature
+   \   000043 CC ....      JP        L:?epilogue_l2_l3
+    279            }
+    280            else
+    281            {
+    282              return(NTC_ResistorToTemperature(NTC_100K_TABLE,temp/10));
+   \                     ??NTC_CountToTemperature_1:
+   \   000046 CD ....      CALL      L:?udiv32_l0_l0_dl
+   \   000049 0000000A     DC32      0xa
+   \   00004D AE ....      LDW       X, #NTC_100K_TABLE
+   \   000050 CD ....      CALL      L:NTC_ResistorToTemperature
+   \   000053 CC ....      JP        L:?epilogue_l2_l3
+    283            }
+    284            
+    285          }
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+     222  NTC_100K_TABLE
+     222  NTC_10K_TABLE
+      86  NTC_CountToTemperature
+     216  NTC_ResistorToTemperature
+      40  NTC_VoltageToResistor
+
+ 
+ 444 bytes in section .near.rodata
+ 342 bytes in section .near_func.text
+ 
+ 342 bytes of CODE  memory
+ 444 bytes of CONST memory
+
+Errors: none
+Warnings: none

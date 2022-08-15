@@ -1,0 +1,176 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 29/Dec/2019  19:46:22
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  
+#        C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\pid.c
+#    Command line =  
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\pid.c" -e
+#        -Ol --no_cse --no_unroll --no_inline --no_code_motion --no_tbaa
+#        --no_cross_call --debug --code_model small --data_model medium -o
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\Obj"
+#        --dlib_config "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD -lCN
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\List" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC
+#        AtomOS\AtomOS1.3\kernel\" -I "C:\Users\Administrator\Desktop\My
+#        Design\JBC AtomOS\AtomOS1.3\ports\stm8\" -I
+#        "C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\" --vregs 16
+#    List file    =  
+#        C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\List\pid.lst
+#    Object file  =  
+#        C:\Users\Administrator\Desktop\My Design\JBC AtomOS\Debug\Obj\pid.o
+#
+###############################################################################
+
+C:\Users\Administrator\Desktop\My Design\JBC AtomOS\User\pid.c
+      1          #include "stm8l15x.h"
+      2          #include "pid.h"
+      3          #include "handle.h"
+      4          #include "system.h"
+      5          
+
+   \                                 In section .near.data, align 1
+      6          float Kp = DEFAULT_PID_P;
+   \                     Kp:
+   \   000000 453B8000     DC32 453B8000H
+
+   \                                 In section .near.data, align 1
+      7          float Ki = DEFAULT_PID_I;
+   \                     Ki:
+   \   000000 43480000     DC32 43480000H
+
+   \                                 In section .near.data, align 1
+      8          float Kd = DEFAULT_PID_D;
+   \                     Kd:
+   \   000000 43480000     DC32 43480000H
+      9          
+
+   \                                 In section .near_func.text, align 1
+     10          long PID_Control(int set,int readback)
+     11          {
+   \                     PID_Control:
+   \   000000 CD ....      CALL      L:?push_l2
+   \   000003 CD ....      CALL      L:?push_w6
+   \   000006 BF ..        LDW       S:?w0, X
+     12            int error = 0;
+   \   000008 3F ..        CLR       S:?b13
+   \   00000A 3F ..        CLR       S:?b12
+     13            static int last_error = 0;
+     14            static float integral = 0;
+     15            static int derivative = 0;
+     16            float pid_out = 0;
+   \   00000C 5F           CLRW      X
+   \   00000D BF ..        LDW       S:?w5, X
+   \   00000F BF ..        LDW       S:?w4, X
+     17            last_error = error;
+   \   000011 BE ..        LDW       X, S:?w6
+   \   000013 CF ....      LDW       L:??last_error, X
+     18            error = set - readback;
+   \   000016 90BF ..      LDW       S:?w1, Y
+   \   000019 BE ..        LDW       X, S:?w0
+   \   00001B 72B0 ....    SUBW      X, S:?w1
+   \   00001F BF ..        LDW       S:?w6, X
+     19            integral = integral + error;
+   \   000021 BE ..        LDW       X, S:?w6
+   \   000023 CD ....      CALL      L:?fcastf32s16_l0_x
+   \   000026 AE ....      LDW       X, #??integral
+   \   000029 CD ....      CALL      L:?fadd32_l0_l0_0x
+   \   00002C AE ....      LDW       X, #??integral
+   \   00002F CD ....      CALL      L:?load32_0x_l0
+     20            derivative = error - last_error;
+   \   000032 BE ..        LDW       X, S:?w6
+   \   000034 72B0 ....    SUBW      X, L:??last_error
+   \   000038 CF ....      LDW       L:??derivative, X
+     21            pid_out = (Kp * error) + (Ki * integral) + (Kd * derivative);
+   \   00003B CE ....      LDW       X, L:??derivative
+   \   00003E CD ....      CALL      L:?fcastf32s16_l0_x
+   \   000041 AE ....      LDW       X, #Kd
+   \   000044 CD ....      CALL      L:?fmul32_l0_l0_0x
+   \   000047 CD ....      CALL      L:?push_l0
+   \   00004A AE ....      LDW       X, #??integral
+   \   00004D 9093         LDW       Y, X
+   \   00004F AE ....      LDW       X, #Ki
+   \   000052 CD ....      CALL      L:?load32_l0_0x
+   \   000055 93           LDW       X, Y
+   \   000056 CD ....      CALL      L:?fmul32_l0_l0_0x
+   \   000059 CD ....      CALL      L:?push_l0
+   \   00005C BE ..        LDW       X, S:?w6
+   \   00005E CD ....      CALL      L:?fcastf32s16_l0_x
+   \   000061 AE ....      LDW       X, #Kp
+   \   000064 CD ....      CALL      L:?fmul32_l0_l0_0x
+   \   000067 CD ....      CALL      L:?pop_l1
+   \   00006A CD ....      CALL      L:?fadd32_l0_l0_l1
+   \   00006D CD ....      CALL      L:?pop_l1
+   \   000070 CD ....      CALL      L:?fadd32_l0_l0_l1
+   \   000073 CD ....      CALL      L:?mov_l2_l0
+     22            if(pid_out > HANDLE_PWM_PEROID_COUNT)
+   \   000076 CD ....      CALL      L:?mov_l0_l2
+   \   000079 CD ....      CALL      L:?fcmpge32_c_l0_dc32
+   \   00007C 469C4001     DC32      0x469c4001
+   \   000080 25 0A        JRC       L:??PID_Control_0
+     23            {
+     24              pid_out = HANDLE_PWM_PEROID_COUNT;
+   \   000082 AE 4000      LDW       X, #0x4000
+   \   000085 BF ..        LDW       S:?w5, X
+   \   000087 AE 469C      LDW       X, #0x469c
+   \   00008A BF ..        LDW       S:?w4, X
+     25            }
+     26            
+     27            if(pid_out < 0)
+   \                     ??PID_Control_0:
+   \   00008C CD ....      CALL      L:?mov_l0_l2
+   \   00008F CD ....      CALL      L:?fcmplt32_c_l0_dc32
+   \   000092 00000000     DC32      0x0
+   \   000096 24 05        JRNC      L:??PID_Control_1
+     28            {
+     29              pid_out = 0;
+   \   000098 5F           CLRW      X
+   \   000099 BF ..        LDW       S:?w5, X
+   \   00009B BF ..        LDW       S:?w4, X
+     30            }
+     31            return(pid_out);
+   \                     ??PID_Control_1:
+   \   00009D CD ....      CALL      L:?mov_l0_l2
+   \   0000A0 CD ....      CALL      L:?fcasts32f32_l0_l0
+   \   0000A3 CC ....      JP        L:?epilogue_l2_w6
+     32          }
+
+   \                                 In section .near.bss, align 1
+   \                     ??last_error:
+   \   000000              DS8 2
+
+   \                                 In section .near.bss, align 1
+   \                     ??integral:
+   \   000000              DS8 4
+
+   \                                 In section .near.bss, align 1
+   \                     ??derivative:
+   \   000000              DS8 2
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       4  Kd
+       4  Ki
+       4  Kp
+     166  PID_Control
+       2  derivative
+       4  integral
+       2  last_error
+
+ 
+   8 bytes in section .near.bss
+  12 bytes in section .near.data
+ 166 bytes in section .near_func.text
+ 
+ 166 bytes of CODE memory
+  20 bytes of DATA memory
+
+Errors: none
+Warnings: 1

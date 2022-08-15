@@ -1,0 +1,759 @@
+
+Unused fragments:
+  Section name     Index  Offset     Size  Object
+  ------------     -----  ------     ----  ------
+  .iar.as_table        1     0x0  0x20000  command line/config
+  .iar.as_entries      2     0x0  0x10000  command line/config
+  .near_func.text     13     0x0      0xa  adc.o
+  VREGS               17     0x0      0x0  adc.o
+  VREGS               23     0x0      0x0  atomkernel.o
+  .near_func.text      9     0x0     0xb1  atommutex.o
+  VREGS               13     0x0      0x0  atommutex.o
+  VREGS               12     0x0      0x0  atomport.o
+  .near_func.text      8     0x0     0x6e  atomqueue.o
+  .near_func.text      9     0x0     0xbf  atomqueue.o
+  .near_func.text     10     0x0    0x164  atomqueue.o
+  .near_func.text     11     0x0    0x15d  atomqueue.o
+  .near_func.text     12     0x0     0x4d  atomqueue.o
+  .near_func.text     13     0x0     0xcc  atomqueue.o
+  .near_func.text     14     0x0     0xcc  atomqueue.o
+  VREGS               15     0x0      0x0  atomqueue.o
+  .near_func.text      8     0x0     0x12  atomsem.o
+  .near_func.text      9     0x0     0xb1  atomsem.o
+  .near_func.text     10     0x0    0x11a  atomsem.o
+  .near_func.text     11     0x0     0xa6  atomsem.o
+  .near_func.text     12     0x0      0xc  atomsem.o
+  .near_func.text     13     0x0     0x4d  atomsem.o
+  VREGS               14     0x0      0x0  atomsem.o
+  .near_func.text     12     0x0      0x6  atomtimer.o
+  .near_func.text     13     0x0      0x6  atomtimer.o
+  VREGS               18     0x0      0x0  atomtimer.o
+  .near.bss            8     0x0      0x1  encoder.o
+  .near.bss            9     0x0      0x1  encoder.o
+  .near_func.text     11     0x0      0xa  encoder.o
+  .near_func.text     12     0x0     0x1f  encoder.o
+  VREGS               15     0x0      0x0  encoder.o
+  VREGS               11     0x0      0x0  Joystick.o
+  .near_func.text     11    0x60     0x3e  lcd19264.o
+                           0x1ca     0x94
+                           0x2bd    0x145
+                           0x4f3     0x43
+                           0x536     0x1b
+                           0x551     0x1b
+                           0x56c     0x1b
+                           0x587     0x1b
+                           0x5a2     0x1b
+  VREGS               12     0x0      0x0  lcd19264.o
+  .near.rodata        14     0x0      0x5  lcd19264.o
+  .near.bss           11     0x0     0x60  nrf24l01.o
+  .near_func.text     22     0x0     0x50  nrf24l01.o
+  .near_func.text     23     0x0     0x5c  nrf24l01.o
+  VREGS               31     0x0      0x0  nrf24l01.o
+  .near_func.text     10     0x0      0x1  PPM.o
+  VREGS               11     0x0      0x0  PPM.o
+  .near_func.text      8     0x0     0x7f  stm8l15x_adc.o
+  .near_func.text     12     0x0     0x27  stm8l15x_adc.o
+  .near_func.text     13     0x0     0x25  stm8l15x_adc.o
+  .near_func.text     14     0x0     0x25  stm8l15x_adc.o
+  .near_func.text     15     0x0     0x4c  stm8l15x_adc.o
+  .near_func.text     16     0x0      0xd  stm8l15x_adc.o
+  .near_func.text     20     0x0     0x4f  stm8l15x_adc.o
+  .near_func.text     21     0x0     0x2b  stm8l15x_adc.o
+  .near_func.text     23     0x0     0x12  stm8l15x_adc.o
+  .near_func.text     24     0x0     0x19  stm8l15x_adc.o
+  .near_func.text     25     0x0      0x9  stm8l15x_adc.o
+  .near_func.text     26     0x0     0x3d  stm8l15x_adc.o
+  .near_func.text     27     0x0     0x23  stm8l15x_adc.o
+  VREGS               28     0x0      0x0  stm8l15x_adc.o
+  .near_func.text      9     0x0     0x41  stm8l15x_clk.o
+  .near_func.text     10     0x0      0xd  stm8l15x_clk.o
+  .near_func.text     11     0x0      0xc  stm8l15x_clk.o
+  .near_func.text     12     0x0      0xd  stm8l15x_clk.o
+  .near_func.text     13     0x0      0xf  stm8l15x_clk.o
+  .near_func.text     14     0x0      0xf  stm8l15x_clk.o
+  .near_func.text     15     0x0      0x5  stm8l15x_clk.o
+  .near_func.text     16     0x0      0xd  stm8l15x_clk.o
+  .near_func.text     17     0x0      0xa  stm8l15x_clk.o
+  .near_func.text     19     0x0      0x4  stm8l15x_clk.o
+  .near_func.text     22     0x0      0xd  stm8l15x_clk.o
+  .near_func.text     23     0x0      0xa  stm8l15x_clk.o
+  .near_func.text     24     0x0      0x4  stm8l15x_clk.o
+  .near_func.text     26     0x0      0x5  stm8l15x_clk.o
+  .near_func.text     27     0x0      0x5  stm8l15x_clk.o
+  .near_func.text     28     0x0     0x13  stm8l15x_clk.o
+  .near_func.text     29     0x0      0xd  stm8l15x_clk.o
+  .near_func.text     30     0x0     0x32  stm8l15x_clk.o
+  .near_func.text     31     0x0     0x98  stm8l15x_clk.o
+  .near_func.text     32     0x0      0x5  stm8l15x_clk.o
+  .near_func.text     33     0x0     0x3e  stm8l15x_clk.o
+  .near_func.text     34     0x0     0x14  stm8l15x_clk.o
+  VREGS               35     0x0      0x0  stm8l15x_clk.o
+  .near_func.text      8     0x0     0x15  stm8l15x_comp.o
+  .near_func.text     10     0x0      0xd  stm8l15x_comp.o
+  .near_func.text     11     0x0     0x26  stm8l15x_comp.o
+  .near_func.text     12     0x0     0x18  stm8l15x_comp.o
+  .near_func.text     13     0x0      0xd  stm8l15x_comp.o
+  .near_func.text     15     0x0      0xd  stm8l15x_comp.o
+  .near_func.text     16     0x0     0x77  stm8l15x_comp.o
+  .near_func.text     17     0x0     0x20  stm8l15x_comp.o
+  .near_func.text     18     0x0     0x25  stm8l15x_comp.o
+  .near_func.text     19     0x0      0xe  stm8l15x_comp.o
+  .near_func.text     20     0x0     0x4b  stm8l15x_comp.o
+  .near_func.text     21     0x0      0xe  stm8l15x_comp.o
+  VREGS               22     0x0      0x0  stm8l15x_comp.o
+  .near_func.text      8     0x0     0x69  stm8l15x_dac.o
+  .near_func.text     11     0x0     0x1f  stm8l15x_dac.o
+  .near_func.text     12     0x0     0x15  stm8l15x_dac.o
+  .near_func.text     13     0x0     0x27  stm8l15x_dac.o
+  .near_func.text     14     0x0     0x19  stm8l15x_dac.o
+  .near_func.text     15     0x0     0x19  stm8l15x_dac.o
+  .near_func.text     17     0x0     0x28  stm8l15x_dac.o
+  .near_func.text     18     0x0     0x45  stm8l15x_dac.o
+  .near_func.text     19     0x0     0x38  stm8l15x_dac.o
+  .near_func.text     20     0x0     0x19  stm8l15x_dac.o
+  .near_func.text     21     0x0     0x1b  stm8l15x_dac.o
+  .near_func.text     22     0x0     0x26  stm8l15x_dac.o
+  .near_func.text     23     0x0     0x18  stm8l15x_dac.o
+  .near_func.text     24     0x0     0x4c  stm8l15x_dac.o
+  .near_func.text     25     0x0     0x17  stm8l15x_dac.o
+  VREGS               26     0x0      0x0  stm8l15x_dac.o
+  .near_func.text      8     0x0      0x9  stm8l15x_dma.o
+  .near_func.text      9     0x0     0x50  stm8l15x_dma.o
+  .near_func.text     13     0x0      0xa  stm8l15x_dma.o
+  .near_func.text     14     0x0      0x8  stm8l15x_dma.o
+  .near_func.text     15     0x0      0x5  stm8l15x_dma.o
+  .near_func.text     17     0x0     0x7d  stm8l15x_dma.o
+  .near_func.text     18     0x0     0x54  stm8l15x_dma.o
+  .near_func.text     19     0x0     0x53  stm8l15x_dma.o
+  VREGS               21     0x0      0x0  stm8l15x_dma.o
+  .near_func.text      8     0x0     0x21  stm8l15x_exti.o
+  .near_func.text     10     0x0     0x31  stm8l15x_exti.o
+  .near_func.text     11     0x0     0x3d  stm8l15x_exti.o
+  .near_func.text     12     0x0     0x54  stm8l15x_exti.o
+  .near_func.text     13     0x0     0x78  stm8l15x_exti.o
+  .near_func.text     14     0x0     0x35  stm8l15x_exti.o
+  .near_func.text     15     0x0     0x1c  stm8l15x_exti.o
+  VREGS               17     0x0      0x0  stm8l15x_exti.o
+  .near_func.text      8     0x0      0xb  stm8l15x_flash.o
+  .near_func.text      9     0x0      0x6  stm8l15x_flash.o
+  .near_func.text     10     0x0      0xe  stm8l15x_flash.o
+  .near_func.text     11     0x0     0x10  stm8l15x_flash.o
+  .near_func.text     12     0x0     0x19  stm8l15x_flash.o
+  .near_func.text     13     0x0      0x7  stm8l15x_flash.o
+  .near_func.text     14     0x0      0x4  stm8l15x_flash.o
+  .near_func.text     15     0x0      0x5  stm8l15x_flash.o
+  .near_func.text     16     0x0     0x30  stm8l15x_flash.o
+  .near_func.text     17     0x0      0x4  stm8l15x_flash.o
+  .near_func.text     18     0x0      0xf  stm8l15x_flash.o
+  .near_func.text     19     0x0     0x10  stm8l15x_flash.o
+  .near_func.text     20     0x0     0x14  stm8l15x_flash.o
+  .near_func.text     21     0x0     0x24  stm8l15x_flash.o
+  .near_func.text     22     0x0     0x24  stm8l15x_flash.o
+  .near_func.text     23     0x0      0xd  stm8l15x_flash.o
+  .near_func.text     24     0x0     0x14  stm8l15x_flash.o
+  .near_func.text     25     0x0      0xe  stm8l15x_flash.o
+  .near_func.text     26     0x0      0x6  stm8l15x_flash.o
+  .near_func.text     27     0x0     0x83  stm8l15x_flash.o
+  .near_func.text     28     0x0     0x3c  stm8l15x_flash.o
+  .near_func.text     29     0x0     0x36  stm8l15x_flash.o
+  VREGS               30     0x0      0x0  stm8l15x_flash.o
+  .near_func.text      8     0x0     0x1b  stm8l15x_gpio.o
+  .near_func.text     10     0x0     0x2c  stm8l15x_gpio.o
+  .near_func.text     11     0x0      0x2  stm8l15x_gpio.o
+  .near_func.text     12     0x0     0x12  stm8l15x_gpio.o
+  .near_func.text     15     0x0      0x7  stm8l15x_gpio.o
+  .near_func.text     16     0x0      0x5  stm8l15x_gpio.o
+  .near_func.text     17     0x0      0x2  stm8l15x_gpio.o
+  .near_func.text     19     0x0      0x6  stm8l15x_gpio.o
+  VREGS               20     0x0      0x0  stm8l15x_gpio.o
+  .near_func.text      8     0x0     0x4c  stm8l15x_i2c.o
+  .near_func.text      9     0x0    0x1b6  stm8l15x_i2c.o
+  .near_func.text     10     0x0      0xd  stm8l15x_i2c.o
+  .near_func.text     11     0x0      0xd  stm8l15x_i2c.o
+  .near_func.text     12     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     13     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     14     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     15     0x0      0xd  stm8l15x_i2c.o
+  .near_func.text     16     0x0      0xd  stm8l15x_i2c.o
+  .near_func.text     17     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     18     0x0     0x26  stm8l15x_i2c.o
+  .near_func.text     19     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     20     0x0     0x25  stm8l15x_i2c.o
+  .near_func.text     21     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     22     0x0     0x28  stm8l15x_i2c.o
+  .near_func.text     23     0x0     0x1e  stm8l15x_i2c.o
+  .near_func.text     24     0x0      0x8  stm8l15x_i2c.o
+  .near_func.text     25     0x0      0x5  stm8l15x_i2c.o
+  .near_func.text     26     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     27     0x0      0xd  stm8l15x_i2c.o
+  .near_func.text     28     0x0     0x25  stm8l15x_i2c.o
+  .near_func.text     29     0x0      0x5  stm8l15x_i2c.o
+  .near_func.text     30     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     31     0x0     0x27  stm8l15x_i2c.o
+  .near_func.text     32     0x0     0x29  stm8l15x_i2c.o
+  .near_func.text     33     0x0     0x15  stm8l15x_i2c.o
+  .near_func.text     34     0x0     0x60  stm8l15x_i2c.o
+  .near_func.text     35     0x0     0x49  stm8l15x_i2c.o
+  .near_func.text     36     0x0     0x41  stm8l15x_i2c.o
+  .near_func.text     37     0x0     0x1b  stm8l15x_i2c.o
+  .near_func.text     38     0x0     0x44  stm8l15x_i2c.o
+  .near_func.text     39     0x0     0x1b  stm8l15x_i2c.o
+  VREGS               40     0x0      0x0  stm8l15x_i2c.o
+  VREGS               37     0x0      0x0  stm8l15x_it.o
+  .near_func.text      8     0x0      0x3  stm8l15x_itc.o
+  .near_func.text      9     0x0     0x21  stm8l15x_itc.o
+  .near_func.text     10     0x0      0x6  stm8l15x_itc.o
+  .near_func.text     11     0x0     0xdf  stm8l15x_itc.o
+  .near_func.text     12     0x0    0x123  stm8l15x_itc.o
+  VREGS               13     0x0      0x0  stm8l15x_itc.o
+  .near_func.text      8     0x0      0x4  stm8l15x_iwdg.o
+  .near_func.text      9     0x0      0x4  stm8l15x_iwdg.o
+  .near_func.text     10     0x0      0x4  stm8l15x_iwdg.o
+  .near_func.text     11     0x0      0x5  stm8l15x_iwdg.o
+  .near_func.text     12     0x0      0x5  stm8l15x_iwdg.o
+  VREGS               13     0x0      0x0  stm8l15x_iwdg.o
+  .near_func.text      8     0x0      0x9  stm8l15x_pwr.o
+  .near_func.text      9     0x0     0x13  stm8l15x_pwr.o
+  .near_func.text     10     0x0      0xd  stm8l15x_pwr.o
+  .near_func.text     11     0x0      0xd  stm8l15x_pwr.o
+  .near_func.text     12     0x0      0xd  stm8l15x_pwr.o
+  .near_func.text     13     0x0      0xd  stm8l15x_pwr.o
+  .near_func.text     14     0x0     0x2f  stm8l15x_pwr.o
+  .near_func.text     15     0x0      0x5  stm8l15x_pwr.o
+  .near_func.text     16     0x0     0x27  stm8l15x_pwr.o
+  .near_func.text     17     0x0      0x5  stm8l15x_pwr.o
+  VREGS               18     0x0      0x0  stm8l15x_pwr.o
+  .near_func.text      8     0x0      0xc  stm8l15x_rst.o
+  .near_func.text      9     0x0      0x4  stm8l15x_rst.o
+  .near_func.text     10     0x0      0x5  stm8l15x_rst.o
+  VREGS               11     0x0      0x0  stm8l15x_rst.o
+  .near_func.text      8     0x0     0x25  stm8l15x_spi.o
+  .near_func.text     10     0xd     0x27  stm8l15x_spi.o
+                            0x34     0x27
+                            0x68     0x12
+                            0x7a     0x29
+                            0xa3     0x16
+                            0xb9     0x10
+  .near_func.text     11     0x0      0x5  stm8l15x_spi.o
+  .near_func.text     12     0x0     0x2c  stm8l15x_spi.o
+  .near_func.text     13     0x0     0x32  stm8l15x_spi.o
+  .near_func.text     15     0x0      0x9  stm8l15x_spi.o
+  .near_func.text     16     0x0     0x54  stm8l15x_spi.o
+  .near_func.text     17     0x0     0x19  stm8l15x_spi.o
+  VREGS               18     0x0      0x0  stm8l15x_spi.o
+  .near_func.text      8     0x0     0x25  stm8l15x_syscfg.o
+  .near_func.text      9     0x0     0x10  stm8l15x_syscfg.o
+  .near_func.text     10     0x0     0x5e  stm8l15x_syscfg.o
+  .near_func.text     12     0x0     0x13  stm8l15x_syscfg.o
+  .near_func.text     13     0x0      0xd  stm8l15x_syscfg.o
+  .near_func.text     14     0x0     0x55  stm8l15x_syscfg.o
+  .near_func.text     15     0x0     0x27  stm8l15x_syscfg.o
+  VREGS               16     0x0      0x0  stm8l15x_syscfg.o
+  .near_func.text      8     0x0     0x99  stm8l15x_tim1.o
+  .near_func.text      9     0x0     0x24  stm8l15x_tim1.o
+  .near_func.text     10     0x0     0x10  stm8l15x_tim1.o
+  .near_func.text     11     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     12     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     13     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     14     0x0     0x2b  stm8l15x_tim1.o
+  .near_func.text     15     0x0     0x1b  stm8l15x_tim1.o
+  .near_func.text     16     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     17     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     18     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     19     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     20     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     21     0x0     0x61  stm8l15x_tim1.o
+  .near_func.text     22     0x0     0x61  stm8l15x_tim1.o
+  .near_func.text     23     0x0     0x61  stm8l15x_tim1.o
+  .near_func.text     24     0x0     0x1b  stm8l15x_tim1.o
+  .near_func.text     25     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     26     0x0     0x34  stm8l15x_tim1.o
+  .near_func.text     27     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     28     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     29     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     30     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     31     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     32     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     33     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     34     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     35     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     36     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     37     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     38     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     39     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     40     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     41     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     42     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     43     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     44     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     45     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     46     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     47     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     48     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     49     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     50     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     51     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     52     0x0      0xb  stm8l15x_tim1.o
+  .near_func.text     53     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     54     0x0     0x43  stm8l15x_tim1.o
+  .near_func.text     55     0x0     0x31  stm8l15x_tim1.o
+  .near_func.text     56     0x0      0xd  stm8l15x_tim1.o
+                             0xd     0x2e
+                            0x3b      0xd
+                            0x48     0x2e
+                            0x76      0xd
+                            0x83     0x2e
+                            0xb1      0xd
+                            0xbe     0x2e
+                            0xec     0x3f
+  .near_func.text     57     0x0     0x76  stm8l15x_tim1.o
+  .near_func.text     58     0x0     0x2b  stm8l15x_tim1.o
+  .near_func.text     59     0x0     0x2b  stm8l15x_tim1.o
+  .near_func.text     60     0x0     0x2b  stm8l15x_tim1.o
+  .near_func.text     61     0x0     0x2b  stm8l15x_tim1.o
+  .near_func.text     62     0x0     0x13  stm8l15x_tim1.o
+  .near_func.text     63     0x0      0x4  stm8l15x_tim1.o
+  .near_func.text     64     0x0     0x25  stm8l15x_tim1.o
+  .near_func.text     65     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     66     0x0     0x29  stm8l15x_tim1.o
+  .near_func.text     67     0x0      0x5  stm8l15x_tim1.o
+  .near_func.text     68     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     69     0x0     0x13  stm8l15x_tim1.o
+  .near_func.text     70     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     71     0x0      0x9  stm8l15x_tim1.o
+  .near_func.text     72     0x0     0x2d  stm8l15x_tim1.o
+  .near_func.text     73     0x0      0xc  stm8l15x_tim1.o
+  .near_func.text     74     0x0      0x8  stm8l15x_tim1.o
+  .near_func.text     75     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     76     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     77     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     78     0x0      0xd  stm8l15x_tim1.o
+  .near_func.text     79     0x0      0xf  stm8l15x_tim1.o
+  .near_func.text     80     0x0     0x3d  stm8l15x_tim1.o
+  .near_func.text     81     0x0      0xd  stm8l15x_tim1.o
+  VREGS               82     0x0      0x0  stm8l15x_tim1.o
+  .near_func.text     10     0x0     0x13  stm8l15x_tim2.o
+  .near_func.text     11     0x0     0x1b  stm8l15x_tim2.o
+  .near_func.text     12     0x0      0x9  stm8l15x_tim2.o
+  .near_func.text     13     0x0      0x9  stm8l15x_tim2.o
+  .near_func.text     14     0x0     0x21  stm8l15x_tim2.o
+  .near_func.text     15     0x0      0x4  stm8l15x_tim2.o
+  .near_func.text     16     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     17     0x0      0xe  stm8l15x_tim2.o
+  .near_func.text     18     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     19     0x0      0xe  stm8l15x_tim2.o
+  .near_func.text     22     0x0     0x57  stm8l15x_tim2.o
+  .near_func.text     23     0x0     0x16  stm8l15x_tim2.o
+  .near_func.text     25     0x0     0x2d  stm8l15x_tim2.o
+  .near_func.text     26     0x0      0x9  stm8l15x_tim2.o
+  .near_func.text     27     0x0      0x9  stm8l15x_tim2.o
+  .near_func.text     28     0x0     0x1b  stm8l15x_tim2.o
+  .near_func.text     29     0x0     0x1b  stm8l15x_tim2.o
+  .near_func.text     30     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     31     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     32     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     33     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     34     0x0      0xe  stm8l15x_tim2.o
+  .near_func.text     35     0x0      0xe  stm8l15x_tim2.o
+  .near_func.text     37     0x0     0x1b  stm8l15x_tim2.o
+                            0x1b     0x38
+                            0x53     0x1b
+                            0x6e     0x38
+                            0xa6     0x23
+  .near_func.text     38     0x0     0x78  stm8l15x_tim2.o
+  .near_func.text     39     0x0     0x21  stm8l15x_tim2.o
+  .near_func.text     40     0x0     0x21  stm8l15x_tim2.o
+  .near_func.text     42     0x0      0x7  stm8l15x_tim2.o
+  .near_func.text     43     0x0     0x25  stm8l15x_tim2.o
+  .near_func.text     44     0x0      0xb  stm8l15x_tim2.o
+  .near_func.text     45     0x0     0x29  stm8l15x_tim2.o
+  .near_func.text     47     0x0     0x13  stm8l15x_tim2.o
+  .near_func.text     48     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     49     0x0      0x9  stm8l15x_tim2.o
+  .near_func.text     50     0x0     0x2d  stm8l15x_tim2.o
+  .near_func.text     51     0x0     0x24  stm8l15x_tim2.o
+  .near_func.text     52     0x0      0x8  stm8l15x_tim2.o
+  .near_func.text     53     0x0     0x1b  stm8l15x_tim2.o
+  .near_func.text     54     0x0     0x1b  stm8l15x_tim2.o
+  .near_func.text     55     0x0     0x1b  stm8l15x_tim2.o
+  .near_func.text     56     0x0      0xd  stm8l15x_tim2.o
+  .near_func.text     57     0x0      0xf  stm8l15x_tim2.o
+  .near_func.text     58     0x0     0x6b  stm8l15x_tim2.o
+  .near_func.text     59     0x0      0xd  stm8l15x_tim2.o
+  VREGS               60     0x0      0x0  stm8l15x_tim2.o
+  .near_func.text     10     0x0     0x13  stm8l15x_tim3.o
+  .near_func.text     11     0x0     0x1b  stm8l15x_tim3.o
+  .near_func.text     12     0x0      0x9  stm8l15x_tim3.o
+  .near_func.text     13     0x0      0x9  stm8l15x_tim3.o
+  .near_func.text     14     0x0     0x21  stm8l15x_tim3.o
+  .near_func.text     15     0x0      0x4  stm8l15x_tim3.o
+  .near_func.text     16     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     17     0x0      0xe  stm8l15x_tim3.o
+  .near_func.text     18     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     21     0x0     0x57  stm8l15x_tim3.o
+  .near_func.text     23     0x0     0x16  stm8l15x_tim3.o
+  .near_func.text     25     0x0     0x2d  stm8l15x_tim3.o
+  .near_func.text     26     0x0      0x9  stm8l15x_tim3.o
+  .near_func.text     27     0x0      0x9  stm8l15x_tim3.o
+  .near_func.text     28     0x0     0x1b  stm8l15x_tim3.o
+  .near_func.text     29     0x0     0x1b  stm8l15x_tim3.o
+  .near_func.text     30     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     31     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     32     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     33     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     34     0x0      0xe  stm8l15x_tim3.o
+  .near_func.text     35     0x0      0xe  stm8l15x_tim3.o
+  .near_func.text     37     0x0     0x1b  stm8l15x_tim3.o
+                            0x1b     0x38
+                            0x53     0x1b
+                            0x6e     0x38
+                            0xa6     0x23
+  .near_func.text     38     0x0     0x78  stm8l15x_tim3.o
+  .near_func.text     39     0x0     0x21  stm8l15x_tim3.o
+  .near_func.text     40     0x0     0x21  stm8l15x_tim3.o
+  .near_func.text     41     0x0     0x13  stm8l15x_tim3.o
+  .near_func.text     42     0x0      0x7  stm8l15x_tim3.o
+  .near_func.text     43     0x0     0x25  stm8l15x_tim3.o
+  .near_func.text     44     0x0      0xb  stm8l15x_tim3.o
+  .near_func.text     45     0x0     0x29  stm8l15x_tim3.o
+  .near_func.text     46     0x0      0x5  stm8l15x_tim3.o
+  .near_func.text     47     0x0     0x13  stm8l15x_tim3.o
+  .near_func.text     48     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     49     0x0      0x9  stm8l15x_tim3.o
+  .near_func.text     50     0x0     0x2d  stm8l15x_tim3.o
+  .near_func.text     51     0x0     0x24  stm8l15x_tim3.o
+  .near_func.text     52     0x0      0x8  stm8l15x_tim3.o
+  .near_func.text     53     0x0     0x1b  stm8l15x_tim3.o
+  .near_func.text     54     0x0     0x1b  stm8l15x_tim3.o
+  .near_func.text     55     0x0     0x1b  stm8l15x_tim3.o
+  .near_func.text     56     0x0      0xd  stm8l15x_tim3.o
+  .near_func.text     57     0x0      0xf  stm8l15x_tim3.o
+  .near_func.text     58     0x0     0x6b  stm8l15x_tim3.o
+  .near_func.text     59     0x0      0xd  stm8l15x_tim3.o
+  VREGS               60     0x0      0x0  stm8l15x_tim3.o
+  .near_func.text     10     0x0     0x13  stm8l15x_tim4.o
+  .near_func.text     11     0x0      0x4  stm8l15x_tim4.o
+  .near_func.text     12     0x0      0x4  stm8l15x_tim4.o
+  .near_func.text     13     0x0      0x9  stm8l15x_tim4.o
+  .near_func.text     14     0x0      0x4  stm8l15x_tim4.o
+  .near_func.text     15     0x0      0xd  stm8l15x_tim4.o
+  .near_func.text     16     0x0      0xe  stm8l15x_tim4.o
+  .near_func.text     17     0x0      0xd  stm8l15x_tim4.o
+  .near_func.text     18     0x0      0xe  stm8l15x_tim4.o
+  .near_func.text     21     0x0      0x7  stm8l15x_tim4.o
+  .near_func.text     22     0x0     0x14  stm8l15x_tim4.o
+  .near_func.text     23     0x0      0x5  stm8l15x_tim4.o
+  .near_func.text     24     0x0     0x29  stm8l15x_tim4.o
+  .near_func.text     26     0x0     0x13  stm8l15x_tim4.o
+  .near_func.text     27     0x0      0x9  stm8l15x_tim4.o
+  .near_func.text     28     0x0     0x1b  stm8l15x_tim4.o
+  .near_func.text     29     0x0     0x1b  stm8l15x_tim4.o
+  .near_func.text     30     0x0     0x1b  stm8l15x_tim4.o
+  .near_func.text     31     0x0      0xd  stm8l15x_tim4.o
+  VREGS               32     0x0      0x0  stm8l15x_tim4.o
+  .near_func.text     10     0x0     0x50  stm8l15x_usart.o
+  .near_func.text     11     0x0     0x27  stm8l15x_usart.o
+  .near_func.text     12     0x0      0x8  stm8l15x_usart.o
+  .near_func.text     13     0x0     0x12  stm8l15x_usart.o
+  .near_func.text     14     0x0      0x5  stm8l15x_usart.o
+  .near_func.text     15     0x0     0x2d  stm8l15x_usart.o
+  .near_func.text     17     0x0     0x2b  stm8l15x_usart.o
+  .near_func.text     18     0x0     0x27  stm8l15x_usart.o
+  .near_func.text     19     0x0     0x25  stm8l15x_usart.o
+  .near_func.text     20     0x0     0x25  stm8l15x_usart.o
+  .near_func.text     21     0x0     0x27  stm8l15x_usart.o
+  .near_func.text     22     0x0     0x27  stm8l15x_usart.o
+  .near_func.text     23     0x0     0x27  stm8l15x_usart.o
+  .near_func.text     24     0x0      0x8  stm8l15x_usart.o
+  .near_func.text     25     0x0     0x27  stm8l15x_usart.o
+  .near_func.text     26     0x0     0x27  stm8l15x_usart.o
+  .near_func.text     27     0x0     0x2c  stm8l15x_usart.o
+  .near_func.text     28     0x0     0x94  stm8l15x_usart.o
+  .near_func.text     30     0x0      0x5  stm8l15x_usart.o
+  .near_func.text     31     0x0     0xa9  stm8l15x_usart.o
+  .near_func.text     32     0x0      0x5  stm8l15x_usart.o
+  VREGS               33     0x0      0x0  stm8l15x_usart.o
+  .near_func.text      8     0x0     0x11  stm8l15x_wfe.o
+  .near_func.text      9     0x0     0x6e  stm8l15x_wfe.o
+  .near_func.text     10     0x0     0x45  stm8l15x_wfe.o
+  VREGS               11     0x0      0x0  stm8l15x_wfe.o
+  .near_func.text     12     0x0     0x80  stm8l15x_wfe.o
+  .near_func.text      8     0x0     0x15  stm8l15x_wwdg.o
+  .near_func.text      9     0x0     0x17  stm8l15x_wwdg.o
+  .near_func.text     10     0x0      0xa  stm8l15x_wwdg.o
+  .near_func.text     11     0x0      0xa  stm8l15x_wwdg.o
+  .near_func.text     12     0x0      0x4  stm8l15x_wwdg.o
+  .near_func.text     13     0x0      0x5  stm8l15x_wwdg.o
+  VREGS               14     0x0      0x0  stm8l15x_wwdg.o
+  .near_func.text      9     0x0     0x2d  system.o
+  VREGS               10     0x0      0x0  system.o
+  VREGS               22     0x0      0x0  tests-main.o
+  VREGS               12     0x0      0x0  uart.o
+  .near.data           9     0x0     0xaf  ui.o
+  .near_func.text     11     0x0     0x24  ui.o
+  .near_func.text     12     0x0     0x34  ui.o
+  VREGS               13     0x0      0x0  ui.o
+  CSTACK               6     0x0      0x0  cstartup.o
+  .near_func.text      7     0xd      0xa  cstartup.o
+  .near_func.text      6    0x15      0x5  long.o
+                            0x1a      0x5
+                            0x1f      0x5
+                            0x32      0x5
+                            0x3c      0x5
+                            0x41      0x5
+                            0x5a      0x5
+                            0x5f      0x3
+                            0x7a      0x5
+                            0x7f      0x3
+                            0x82      0x3
+                            0x85     0x18
+                           0x127      0x5
+                           0x131      0x5
+                           0x1a6      0x5
+                           0x1ab      0x5
+                           0x1b0      0x5
+                           0x1fe     0x10
+                           0x20e      0xb
+                           0x219      0x9
+                           0x239      0x9
+                           0x25d      0x3
+                           0x260     0x18
+                           0x278      0x3
+                           0x27b     0x18
+                           0x293      0x4
+                           0x297      0x3
+                           0x29a      0xe
+                           0x2a8      0x4
+                           0x2ac      0x3
+                           0x2af      0xe
+  .near_func.text      6     0xa      0x5  vreg_util.o
+                             0xf      0x5
+                            0x19      0x5
+                            0x23      0x5
+                            0x3b      0x7
+                            0x42      0x7
+                            0x49      0x7
+                            0x50      0x7
+                            0x5e      0x7
+                            0x6c      0x7
+                            0x7b     0x18
+                            0x93     0x18
+                            0xab     0x18
+                            0xc3     0x18
+                            0xdb      0xf
+                            0xea      0xf
+                            0xf9      0xf
+                           0x108      0xf
+                           0x117      0xb
+                           0x199      0x7
+                           0x1a0      0x7
+                           0x1ae      0x7
+                           0x1bc      0x7
+                           0x1c3      0x7
+                           0x1d8      0x7
+                           0x1df      0x7
+                           0x1f4      0x7
+                           0x1fb      0x7
+                           0x202      0x7
+                           0x209      0x7
+                           0x210      0x7
+                           0x217      0x7
+                           0x21e      0x7
+                           0x225      0x7
+                           0x22c      0x7
+                           0x241      0x7
+                           0x248      0x7
+                           0x24f      0x7
+                           0x256      0x7
+                           0x25d      0x7
+                           0x272      0x7
+                           0x279      0x7
+                           0x280      0x7
+                           0x287      0x7
+                           0x28e      0x7
+                           0x295      0x7
+                           0x29c      0x7
+                           0x2a3      0x7
+                           0x2aa      0x7
+                           0x2b1      0x7
+                           0x2b8      0x7
+                           0x2bf      0x7
+                           0x2c6      0x7
+                           0x2e7      0x3
+                           0x2ea      0x3
+                           0x2ed      0x7
+                           0x30e      0x3
+                           0x311      0x3
+                           0x314      0x7
+                           0x328      0x3
+                           0x32b      0x3
+                           0x32e      0x7
+                           0x335      0x3
+                           0x338      0x3
+                           0x33b      0x7
+                           0x34f      0x3
+                           0x352      0x3
+                           0x355      0x7
+                           0x35c      0x3
+                           0x35f      0x3
+                           0x362      0x7
+  .near_func.text      6    0x38      0x5  long_util.o
+                            0x3d      0x2
+                            0x3f      0x9
+                            0x8f      0x5
+                            0x94      0x2
+                            0x96      0xa
+  VREGS                8     0x0      0x0  memcpy.o
+  .near_func.text      6     0x0     0x12  move.o
+                            0x1f     0x16
+                            0x35     0x13
+                            0x48     0x17
+                            0x5f     0x12
+                            0x71      0xf
+                            0x80      0x2
+                            0x82     0x10
+                            0x92      0xe
+  .near_func.text      6    0x37     0x10  short.o
+                            0x47      0x3
+                            0x4a      0x8
+                            0x52      0x8
+                            0x5a      0x8
+                            0x62      0x8
+                            0x6a      0x8
+                            0x72      0x8
+                            0x7a      0x8
+                            0x82      0x8
+                            0x8a      0x3
+                            0x8d      0x8
+                            0x95      0x8
+                            0x9d      0x8
+                            0xa5      0x8
+                            0xad      0x8
+                            0xb5      0x8
+                            0xbd      0x8
+                            0xc5      0x8
+                            0xcd      0x3
+                            0xd0      0x8
+                            0xd8      0x8
+                            0xe0      0x8
+                            0xe8      0x8
+                            0xf0      0x8
+                            0xf8      0x8
+                           0x100      0x8
+                           0x108      0x8
+                           0x118      0x8
+                           0x120      0x8
+                           0x128      0x1
+                           0x129      0x1
+                           0x12a      0x1
+                           0x12b      0x1
+                           0x12c      0x1
+                           0x12d      0x1
+                           0x12e      0x1
+                           0x12f      0x1
+                           0x130      0x1
+                           0x131      0x1
+                           0x132      0x1
+                           0x138      0x1
+                           0x139      0x1
+                           0x13a      0x1
+                           0x13b      0x1
+                           0x13c      0x1
+                           0x13d      0x1
+                           0x13e      0x1
+                           0x13f      0x1
+                           0x140      0x1
+                           0x141      0x1
+                           0x142      0x1
+                           0x148      0x1
+                           0x149      0x1
+                           0x14a      0x1
+                           0x14b      0x1
+                           0x14c      0x1
+                           0x14d      0x1
+                           0x14e      0x1
+                           0x14f      0x1
+                           0x150      0x1
+                           0x151      0x1
+                           0x152      0x1
+                           0x153      0x5
+                           0x158      0x7
+  VREGS                8     0x0      0x0  strlen.o
+  .near_func.text      6     0x0     0x1a  char.o
+                            0x1a     0x14
+                            0x2e      0xa
+                            0x38      0xa
+                            0x42      0xa
+                            0x4c      0x1
+                            0x52      0x1
+                            0x53      0x5
+                            0x58      0x1
+                            0x59      0x1
+                            0x5a      0x1
+                            0x5b      0x5
+  .near_func.text      6     0xc     0x15  switch.o
+  VREGS                7     0x0      0x0  printf.o
+  VREGS                7     0x0      0x0  putchar.o
+  .near_func.text      6     0x0     0x1e  cppinit.o
+  .iar.dynexit         7     0x0      0x6  cppinit.o
+  .near.data           8     0x0      0x2  cppinit.o
+  .near_func.text      9     0x0     0x30  cppinit.o
+  .near_func.text     10     0x0     0x4b  cppinit.o
+                            0x4b      0x4
+  .near.bss           11     0x0      0x2  cppinit.o
+  VREGS               12     0x0      0x0  cppinit.o
+  .iar.dynexit        13     0x0      0x0  cppinit.o
+  VREGS                7     0x0      0x0  init.o
+  Region$$Table        8     0x0      0x0  init.o
+  VREGS                7     0x0      0x0  low_level_init.o
+  VREGS                7     0x0      0x0  exit.o
+  .near_func.text      6     0x7      0xe  dc_util.o
+                            0x15      0xe
+                            0x23      0xe
+                            0x31      0xe
+                            0x3f      0xe
+                            0x4d      0xe
+                            0x5b      0xe
+                            0x69      0xe
+                            0x77      0x9
+                            0x80      0xd
+                            0x9a      0xd
+                            0xa7      0xd
+  VREGS               32     0x0      0x0  xprintffull_nomb.o
+  VREGS                7     0x0      0x0  xprout.o
+  .near_func.text      6     0x1      0x3  cexit.o
+                             0x4      0x3
+                             0x7      0x3
+  .near_func.text      6    0x1d      0x5  float.o
+                            0x22      0x5
+                            0x27      0x3
+                            0x30      0x5
+                            0x35      0x3
+                           0x10b      0x3
+                           0x1a9      0x5
+                           0x1ae      0x5
+                           0x1b3      0x3
+                           0x264      0x3
+                           0x267      0x8
+                           0x26f      0x5
+                           0x274      0x3
+                           0x277     0x25
+                           0x2a1      0x3
+                           0x2ad      0x3
+                           0x306      0x7
+                           0x30d      0x2
+                           0x30f     0x1c
+                           0x32b     0x13
+                           0x33e     0x17
+                           0x355     0x1e
+                           0x530      0xc
+  .near_func.text      6     0x0     0x20  float_libsup.o
+  .near_func.text      7     0x0      0x3  memchr.o
+  VREGS               10     0x0      0x0  memchr.o
+  .near_func.text      7     0x0      0x3  strchr.o
+  VREGS               10     0x0      0x0  strchr.o
+  VREGS                7     0x0      0x0  div.o
+  .near_func.text      6     0x0      0xb  xcloseall.o
+  VREGS                7     0x0      0x0  xcloseall.o
+  VREGS                9     0x0      0x0  __dbg_xxexit.o
+  VREGS                9     0x0      0x0  __dbg_break.o

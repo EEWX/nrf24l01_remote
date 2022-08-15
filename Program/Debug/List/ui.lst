@@ -1,0 +1,190 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 23/Jun/2020  23:31:00
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\User\ui.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\ui.c" -e -Ol --no_cse
+#        --no_unroll --no_inline --no_code_motion --no_tbaa --no_cross_call
+#        --debug --code_model small --data_model medium -o
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj" --dlib_config
+#        "C:\Program Files (x86)\IAR Systems\Embedded Workbench
+#        7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD -lCN
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\"
+#    List file    =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\ui.lst
+#    Object file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\ui.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\User\ui.c
+      1          #include "stm8l15x.h"
+      2          #include "lcd19264.h"
+      3          #include "ui.h"
+      4          #include "encoder.h"
+      5          
+
+   \                                 In section .near.bss, align 1
+      6          Menu_Typedef MenuList;
+   \                     MenuList:
+   \   000000              DS8 5
+
+   \                                 In section .near.data, align 1
+      7          Window_Typedef UI_Table[5]=
+   \                     UI_Table:
+   \   000000 00           DC8 0
+   \   000001 20 20 20 20  DC8 "    WORKING     "
+   \          57 4F 52 4B 
+   \   000012 54 49 50 3A  DC8 "TIP:123CSET:    "
+   \          31 32 33 43 
+   \   000023 01           DC8 1
+   \   000024 20 20 20 20  DC8 "    SLEEPING    "
+   \          53 4C 45 45 
+   \   000035 54 49 50 3A  DC8 "TIP:123CSET:    "
+   \          31 32 33 43 
+   \   000046 02           DC8 2
+   \   000047 20 20 20 20  DC8 "    SETTING1    "
+   \          53 45 54 54 
+   \   000058 57 4F 52 4B  DC8 "WORKING SETPOINT"
+   \          49 4E 47 20 
+   \   000069 03           DC8 3
+   \   00006A 20 20 20 20  DC8 "    SETTING2    "
+   \          53 45 54 54 
+   \   00007B 53 4C 45 45  DC8 "SLEEPING SETPOIN"
+   \          50 49 4E 47 
+   \   00008C 04           DC8 4
+   \   00008D 20 20 20 20  DC8 "    SETTING3    "
+   \          53 45 54 54 
+   \   00009E 54 49 50 3A  DC8 "TIP:123  SET:   "
+   \          31 32 33 20 
+      8          {
+      9            {0,"    WORKING     ","TIP:123CSET:    "},
+     10            {1,"    SLEEPING    ","TIP:123CSET:    "},
+     11            {2,"    SETTING1    ","WORKING SETPOINT"},
+     12            {3,"    SETTING2    ","SLEEPING SETPOIN"},
+     13            {4,"    SETTING3    ","TIP:123  SET:   "},
+     14          };
+     15          
+
+   \                                 In section .near_func.text, align 1
+     16          void UI_Init(void)
+     17          {
+     18            MenuList.Page = 0;
+   \                     UI_Init:
+   \   000000 35 00 ....   MOV       L:MenuList + 1, #0x0
+     19            MenuList.PageMax = 4;
+   \   000004 35 04 ....   MOV       L:MenuList + 2, #0x4
+     20          }
+   \   000008 81           RET
+     21          
+
+   \                                 In section .near_func.text, align 1
+     22          void UI_Display(Window_Typedef *win)
+     23          {
+   \                     UI_Display:
+   \   000000 CD ....      CALL      L:?push_w4
+   \   000003 BF ..        LDW       S:?w4, X
+     24            LCD1602_DisplayString(0,0,win->Line_H);
+   \   000005 BE ..        LDW       X, S:?w4
+   \   000007 1C 0001      ADDW      X, #0x1
+   \   00000A BF ..        LDW       S:?w0, X
+   \   00000C 905F         CLRW      Y
+   \   00000E 5F           CLRW      X
+   \   00000F CD ....      CALL      L:LCD1602_DisplayString
+     25            LCD1602_DisplayString(0,1,win->Line_L);
+   \   000012 BE ..        LDW       X, S:?w4
+   \   000014 1C 0012      ADDW      X, #0x12
+   \   000017 BF ..        LDW       S:?w0, X
+   \   000019 90AE 0001    LDW       Y, #0x1
+   \   00001D 5F           CLRW      X
+   \   00001E CD ....      CALL      L:LCD1602_DisplayString
+     26          }
+   \   000021 CC ....      JP        L:?epilogue_w4
+     27          
+
+   \                                 In section .near_func.text, align 1
+     28          void UI_KeyProcess(Key_TypeDef *key)
+     29          {
+     30            switch(*key)
+   \                     UI_KeyProcess:
+   \   000000 F6           LD        A, (X)
+   \   000001 4D           TNZ       A
+   \   000002 27 2D        JREQ      L:??UI_KeyProcess_0
+   \   000004 4A           DEC       A
+   \   000005 27 2A        JREQ      L:??UI_KeyProcess_0
+   \   000007 4A           DEC       A
+   \   000008 27 06        JREQ      L:??UI_KeyProcess_1
+   \   00000A A0 02        SUB       A, #0x2
+   \   00000C 27 1B        JREQ      L:??UI_KeyProcess_2
+   \   00000E 20 21        JRA       L:??UI_KeyProcess_0
+     31            {
+     32              case Key_Null:
+     33                
+     34                break;
+     35              case Key_Push:
+     36                
+     37                break;
+     38              case Key_Increase:
+     39                MenuList.Page++;
+   \                     ??UI_KeyProcess_1:
+   \   000010 A6 01        LD        A, #0x1
+   \   000012 CB ....      ADD       A, L:MenuList + 1
+   \   000015 C7 ....      LD        L:MenuList + 1, A
+     40                if(MenuList.Page > MenuList.PageMax)
+   \   000018 90AE ....    LDW       Y, #MenuList + 2
+   \   00001C 90F6         LD        A, (Y)
+   \   00001E C1 ....      CP        A, L:MenuList + 1
+   \   000021 24 0E        JRNC      L:??UI_KeyProcess_0
+     41                {
+     42                  MenuList.Page = 0;
+   \   000023 35 00 ....   MOV       L:MenuList + 1, #0x0
+     43                }
+     44                break;
+   \   000027 20 08        JRA       L:??UI_KeyProcess_0
+     45              case Key_Decrease:
+     46                MenuList.Page--;
+   \                     ??UI_KeyProcess_2:
+   \   000029 A6 FF        LD        A, #0xff
+   \   00002B CB ....      ADD       A, L:MenuList + 1
+   \   00002E C7 ....      LD        L:MenuList + 1, A
+     47                if(MenuList.Page < 0)
+     48                {
+     49                  MenuList.Page = MenuList.PageMax;
+     50                }
+     51                break;
+     52              default:
+     53                break;
+     54            }
+     55            *key = Key_Null;
+   \                     ??UI_KeyProcess_0:
+   \   000031 4F           CLR       A
+   \   000032 F7           LD        (X), A
+     56          }
+   \   000033 81           RET
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+       5  MenuList
+      36  UI_Display
+       9  UI_Init
+      52  UI_KeyProcess
+     175  UI_Table
+
+ 
+   5 bytes in section .near.bss
+ 175 bytes in section .near.data
+  97 bytes in section .near_func.text
+ 
+  97 bytes of CODE memory
+ 180 bytes of DATA memory
+
+Errors: none
+Warnings: 2

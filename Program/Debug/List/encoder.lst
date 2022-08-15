@@ -1,0 +1,164 @@
+###############################################################################
+#
+# IAR C/C++ Compiler V2.20.1.176 for STM8                 18/Jun/2020  21:51:04
+# Copyright 2010-2015 IAR Systems AB.
+# Standalone license - IAR Embedded Workbench for STMicroelectronics STM8
+#
+#    Source file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\User\encoder.c
+#    Command line =  
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\encoder.c" -e -Om
+#        --no_unroll --no_inline --no_tbaa --no_cross_call --debug --code_model
+#        small --data_model medium -o "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\Debug\Obj" --dlib_config "C:\Program Files (x86)\IAR
+#        Systems\Embedded Workbench 7.3\stm8\LIB\dlstm8smn.h" -D STM8L15X_MD
+#        -lCN "E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List" -I
+#        "E:\MyDesign\ToyRemote\MCU
+#        Unit\Program\STM8L15x_StdPeriph_Driver\inc\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\kernel\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\AtomOS1.3\ports\stm8\" -I
+#        "E:\MyDesign\ToyRemote\MCU Unit\Program\User\" --vregs 16
+#    List file    =  
+#        E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\List\encoder.lst
+#    Object file  =  E:\MyDesign\ToyRemote\MCU Unit\Program\Debug\Obj\encoder.o
+#
+###############################################################################
+
+E:\MyDesign\ToyRemote\MCU Unit\Program\User\encoder.c
+      1          #include "stm8l15x.h"
+      2          #include "encoder.h"
+      3          #include "handle.h"
+      4          #include "atomtimer.h"
+      5          #include "system.h"
+      6          
+
+   \                                 In section .near.bss, align 1
+      7          Key_TypeDef Encoderkey;
+   \                     Encoderkey:
+   \   000000              DS8 1
+
+   \                                 In section .near.bss, align 1
+      8          FlagStatus KeyStatus = RESET;
+   \                     KeyStatus:
+   \   000000              DS8 1
+      9          
+
+   \                                 In section .near_func.text, align 1
+     10          void ENCODER_Init(void)
+     11          {
+     12            GPIO_Init(ENCODER_A_GPIO,ENCODER_A_PIN,GPIO_Mode_In_PU_IT);
+   \                     ENCODER_Init:
+   \   000000 35 60 ....   MOV       S:?b0, #0x60
+   \   000004 A6 20        LD        A, #0x20
+   \   000006 AE 500F      LDW       X, #0x500f
+   \   000009 CD ....      CALL      L:GPIO_Init
+     13            GPIO_Init(ENCODER_B_GPIO,ENCODER_B_PIN,GPIO_Mode_In_PU_No_IT);
+   \   00000C 35 40 ....   MOV       S:?b0, #0x40
+   \   000010 A6 40        LD        A, #0x40
+   \   000012 AE 500F      LDW       X, #0x500f
+   \   000015 CD ....      CALL      L:GPIO_Init
+     14            GPIO_Init(ENCODER_BUTTON_GPIO,ENCODER_BUTTON_PIN,GPIO_Mode_In_PU_IT);
+   \   000018 35 60 ....   MOV       S:?b0, #0x60
+   \   00001C A6 80        LD        A, #0x80
+   \   00001E AE 5000      LDW       X, #0x5000
+   \   000021 CD ....      CALL      L:GPIO_Init
+     15            GPIO_Init(ENCODER_BEEPER_GPIO,ENCODER_BEEPER_PIN,GPIO_Mode_Out_PP_Low_Slow);
+   \   000024 35 C0 ....   MOV       S:?b0, #0xc0
+   \   000028 A6 01        LD        A, #0x1
+   \   00002A AE 5000      LDW       X, #0x5000
+   \   00002D CC ....      JP        L:GPIO_Init
+     16            
+     17           // EXTI_SetPinSensitivity(EXTI_Pin_6,EXTI_Trigger_Falling);      //encoder A input
+     18            //EXTI_SetPinSensitivity(EXTI_Pin_7,EXTI_Trigger_Falling);      //encoder button input
+     19            
+     20          }
+     21          
+
+   \                                 In section .near_func.text, align 1
+     22          void ENCODER_BeeperBeep(uint8_t time10ms)
+     23          {
+     24            //TIM2_CtrlPWMOutputs(ENABLE);
+     25            atomTimerDelay(time10ms);
+   \                     ENCODER_BeeperBeep:
+   \   000000 5F           CLRW      X
+   \   000001 97           LD        XL, A
+   \   000002 BF ..        LDW       S:?w1, X
+   \   000004 5F           CLRW      X
+   \   000005 BF ..        LDW       S:?w0, X
+   \   000007 CC ....      JP        L:atomTimerDelay
+     26            //TIM2_CtrlPWMOutputs(DISABLE);
+     27          }
+     28          
+
+   \                                 In section .near_func.text, align 1
+     29          void ENCODER_BeeperClickSound(void)
+     30          {
+     31            GPIO_WriteBit(ENCODER_BEEPER_GPIO,ENCODER_BEEPER_PIN,SET);
+   \                     ENCODER_BeeperClickSound:
+   \   000000 35 01 ....   MOV       S:?b0, #0x1
+   \   000004 A6 01        LD        A, #0x1
+   \   000006 AE 5000      LDW       X, #0x5000
+   \   000009 CD ....      CALL      L:GPIO_WriteBit
+     32            atomTimerDelay(1);
+   \   00000C 5F           CLRW      X
+   \   00000D BF ..        LDW       S:?w0, X
+   \   00000F 5C           INCW      X
+   \   000010 BF ..        LDW       S:?w1, X
+   \   000012 CD ....      CALL      L:atomTimerDelay
+     33            GPIO_WriteBit(ENCODER_BEEPER_GPIO,ENCODER_BEEPER_PIN,RESET);
+   \   000015 3F ..        CLR       S:?b0
+   \   000017 A6 01        LD        A, #0x1
+   \   000019 AE 5000      LDW       X, #0x5000
+   \   00001C CC ....      JP        L:GPIO_WriteBit
+     34          }
+     35          
+
+   \                                 In section .near_func.text, align 1
+     36          void ENCODER_Push_ISR(void)
+     37          {
+     38           
+     39          }
+   \                     ENCODER_Push_ISR:
+   \   000000 81           RET
+     40          
+
+   \                                 In section .near_func.text, align 1
+     41          void ENCODER_Rotate_ISR(void)
+     42          {
+     43            
+     44            if(GPIO_ReadInputDataBit(ENCODER_B_GPIO,ENCODER_B_PIN) != RESET)
+   \                     ENCODER_Rotate_ISR:
+   \   000000 A6 40        LD        A, #0x40
+   \   000002 AE 500F      LDW       X, #0x500f
+   \   000005 CC ....      JP        L:GPIO_ReadInputDataBit
+     45            {
+     46            }
+     47            else
+     48            {
+     49              
+     50            }
+     51          }
+     52          
+     53          
+     54          
+
+   Section sizes:
+
+   Bytes  Function/Label
+   -----  --------------
+      10  ENCODER_BeeperBeep
+      31  ENCODER_BeeperClickSound
+      48  ENCODER_Init
+       1  ENCODER_Push_ISR
+       8  ENCODER_Rotate_ISR
+       1  Encoderkey
+       1  KeyStatus
+
+ 
+  2 bytes in section .near.bss
+ 98 bytes in section .near_func.text
+ 
+ 98 bytes of CODE memory
+  2 bytes of DATA memory
+
+Errors: none
+Warnings: 1
